@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cragent - Web Testing Agent</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-top: #f7f4ec;
+            --bg-bottom: #eef6ff;
+            --card: #ffffff;
+            --ink: #1f2937;
+            --muted: #667085;
+            --line: #d7dee8;
+            --brand: #0f766e;
+            --brand-soft: #c9f6ef;
+            --danger: #b42318;
+            --danger-soft: #fde6e4;
+            --planner: #e7e7e7;
+            --planner-soft: linear-gradient(to right,#565656 0%,#778498 75%,#a1c4db 90%,#87ceeb 100%);
+            --executor: #e7e7e7;
+            --executor-soft: linear-gradient(to right,#565656 0%,#77987d 75%,#a6d8a2 90%,#87eb89 100%);
+            --system: #e7e7e7;
+            --system-soft: linear-gradient(to right,#565656 0%,#987777 75%,#db9c9c 90%,#eb8787 100%);
+            --shadow: 0 10px 26px rgba(31, 41, 55, 0.08);
+            --radius: 14px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at 10% 0%, rgba(0, 0, 0, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 20%, rgba(0, 0, 0, 0.05) 0%, transparent 35%),
+                linear-gradient(180deg, #8a8a8a 0%, #3c3c3c 100%);
+            min-height: 100vh;
+            padding: 22px;
+        }
+
+        .page {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 14px;
+            animation: fadeUp 380ms ease both;
+        }
+
+        .title {
+            margin: 0;
+            font-size: clamp(1.45rem, 2.5vw, 2rem);
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            margin: 6px 0 0;
+            color: var(rgb(49, 49, 49));
+            font-size: 0.95rem;
+        }
+
+        .badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            border: 1px solid var(--line);
+            background: #fff;
+            border-radius: 999px;
+            padding: 6px 11px;
+            font-size: 0.8rem;
+            color: #344054;
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 12px;
+            overflow: hidden;
+            animation: fadeUp 460ms ease both;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 247, 250, 0.85));
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 0.92rem;
+            letter-spacing: 0.01em;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.82rem;
+            color: #475467;
+            letter-spacing: 0.02em;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            border: 1px solid #c8d2df;
+            border-radius: 11px;
+            padding: 10px 12px;
+            font-size: 0.95rem;
+            color: var(--ink);
+            background: #fff;
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            transition: border-color 120ms ease, box-shadow 120ms ease;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #0ea5a3;
+            box-shadow: 0 0 0 4px rgba(14, 165, 163, 0.14);
+        }
+
+        textarea { min-height: 90px; resize: vertical; }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        button {
+            border: none;
+            border-radius: 11px;
+            padding: 9px 14px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            transition: transform 100ms ease, opacity 100ms ease;
+        }
+
+        button:active { transform: translateY(1px); }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .btn-run { background: var(--brand); color: #fff; }
+        .btn-stop { background: #111827; color: #fff; }
+        .btn-soft { background: #e5eef9; color: #1f2937; }
+        .btn-captcha { background: #b54708; color: #fff; }
+        .btn-restore { background: #1d4ed8; color: #fff; }
+
+        .state-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .pill {
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #fff;
+            padding: 4px 10px;
+            font-size: 0.78rem;
+            color: #344054;
+        }
+
+        .error-banner {
+            display: none;
+            background: var(--danger-soft);
+            color: var(--danger);
+            border: 1px solid #f4b4ae;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 0 0 10px;
+            font-size: 0.9rem;
+            animation: fadeUp 180ms ease both;
+        }
+
+        .status-line {
+            min-height: 19px;
+            font-size: 0.9rem;
+            color: #0b4f6c;
+        }
+
+        .interrupt {
+            display: none;
+            margin-top: 10px;
+            border-radius: 12px;
+            border: 1px solid #f8d7a5;
+            background: #fff7e6;
+            padding: 10px;
+        }
+
+        .interrupt-title {
+            margin: 0 0 4px;
+            font-size: 0.84rem;
+            color: #9a3412;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .interrupt-question {
+            margin: 0 0 8px;
+            font-size: 0.93rem;
+            color: #7c2d12;
+        }
+
+        .logs-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            align-items: start;
+        }
+
+        .log-card {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #fff;
+            height: 420px;
+            display: flex;
+            flex-direction: column;
+            animation: fadeUp 520ms ease both;
+        }
+
+        .log-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 9px 10px;
+            font-size: 0.84rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .planner-head { background: var(--planner-soft); color: var(--planner); }
+        .executor-head { background: var(--executor-soft); color: var(--executor); }
+        .system-head { background: var(--system-soft); color: var(--system); }
+
+        .count {
+            font-size: 0.72rem;
+            border: 1px solid currentColor;
+            border-radius: 999px;
+            border-color: rgb(27, 27, 27);
+            padding: 2px 8px;
+            color: rgb(27, 27, 27);
+            background: rgba(255, 255, 255, 0.62);
+        }
+
+        .log-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    #fff,
+                    #fff 23px,
+                    #f8fafc 23px,
+                    #f8fafc 24px
+                );
+            font-family: "IBM Plex Mono", Consolas, monospace;
+            font-size: 0.79rem;
+            line-height: 1.45;
+            color: #1f2937;
+        }
+
+        .entry {
+            padding: 5px 6px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            word-break: break-word;
+            white-space: pre-wrap;
+            animation: fadeIn 150ms ease both;
+        }
+
+        .entry-time { color: #667085; margin-right: 7px; }
+        .entry-status { background: #dbeafe; }
+        .entry-error { background: #fee2e2; color: #991b1b; }
+        .entry-stdout { background: #f8fafc; }
+        .entry-stderr { background: #fff0dd; color: #9a3412; }
+        .entry-interrupt { background: #fff7db; color: #8a4b0f; font-weight: 600; }
+        .entry-tree {
+            background: #f8fafc;
+            border: 1px dashed #c8d2df;
+            font-size: 0.76rem;
+        }
+
+        .results-wrap {
+            display: none;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 700px;
+            font-size: 0.86rem;
+        }
+
+        th, td {
+            text-align: left;
+            border-bottom: 1px solid var(--line);
+            padding: 8px 9px;
+            vertical-align: top;
+        }
+
+        th { color: #475467; font-weight: 600; }
+
+        .status-pass { color: #166534; font-weight: 700; }
+        .status-fail { color: #b42318; font-weight: 700; }
+        .status-error { color: #9a3412; font-weight: 700; }
+        .status-skip { color: #6b7280; }
+
+        .summary {
+            display: none;
+            margin-bottom: 8px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            padding: 8px 10px;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+
+        .report-wrap { display: none; }
+
+        .report-content {
+            max-height: 360px;
+            overflow-y: auto;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            padding: 10px;
+            background: #fbfdff;
+            font-size: 0.84rem;
+            white-space: pre-wrap;
+            font-family: "IBM Plex Mono", Consolas, monospace;
+        }
+
+        @keyframes fadeUp {
+            from { transform: translateY(6px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0.15; transform: translateY(3px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 1080px) {
+            .logs-grid { grid-template-columns: 1fr; }
+            .log-card { height: 340px; }
+        }
+
+        @media (max-width: 780px) {
+            body { padding: 12px; }
+            .hero { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <section class="hero">
+            <div>
+                <h1 class="title">Cragent Autonomous Web QA</h1>
+                <p class="subtitle">Planner and executor activity is split into dedicated cards with live control hooks.</p>
+            </div>
+            <div class="badges">
+                <span class="badge" id="run-id-badge">Run: n/a</span>
+                <span class="badge" id="headless-badge">Headless: n/a</span>
+                <span class="badge" id="mode-badge">Mode: idle</span>
+            </div>
+        </section>
+
+        <div id="error-banner" class="error-banner"></div>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h2 class="panel-title">Run Controls</h2>
+                <div class="status-line" id="status-line">Ready.</div>
+            </div>
+            <div class="panel-body form-grid">
+                <div class="row">
+                    <label for="url-input">Target URL</label>
+                    <input type="text" id="url-input" placeholder="https://example.com">
+                </div>
+
+                <div class="row">
+                    <label for="instructions-input">Testing instructions (optional)</label>
+                    <textarea id="instructions-input" placeholder="Describe scope, credentials, or constraints. Leave blank for planner auto-detect."></textarea>
+                </div>
+
+                <div class="actions">
+                    <button id="run-btn" class="btn-run" onclick="startRun()">Run</button>
+                    <button id="stop-btn" class="btn-stop" onclick="stopRun()" disabled>Close Stream</button>
+                    <button id="captcha-on-btn" class="btn-captcha" onclick="enableCaptchaMode()" disabled>Captcha Spotted: Show Browser</button>
+                    <button id="captcha-off-btn" class="btn-restore" onclick="restoreAfterCaptcha()" disabled>Captcha Solved: Restore</button>
+                    <button id="headless-toggle-btn" class="btn-soft" onclick="toggleHeadless()" disabled>Headless: n/a</button>
+                </div>
+
+                <div class="state-row">
+                    <span class="pill" id="input-pill">Planner input: none pending</span>
+                    <span class="pill" id="stream-pill">SSE: disconnected</span>
+                </div>
+
+                <div id="interrupt-panel" class="interrupt">
+                    <p class="interrupt-title">Planner Clarification Required</p>
+                    <p id="interrupt-question" class="interrupt-question"></p>
+                    <div class="actions">
+                        <input type="text" id="interrupt-answer" placeholder="Answer for planner..." style="flex: 1 1 360px;">
+                        <button id="submit-interrupt-btn" class="btn-run" onclick="submitPlannerAnswer()">Send Answer</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h2 class="panel-title">Live Activity</h2>
+                <div class="actions">
+                    <button class="btn-soft" onclick="clearLogs()">Clear Logs</button>
+                </div>
+            </div>
+            <div class="panel-body logs-grid">
+                <article class="log-card">
+                    <header class="log-head planner-head">
+                        <span>Planner Card</span>
+                        <span class="count" id="planner-count">0</span>
+                    </header>
+                    <div class="log-body" id="planner-log"></div>
+                </article>
+
+                <article class="log-card">
+                    <header class="log-head executor-head">
+                        <span>Executor Card</span>
+                        <span class="count" id="executor-count">0</span>
+                    </header>
+                    <div class="log-body" id="executor-log"></div>
+                </article>
+
+                <article class="log-card">
+                    <header class="log-head system-head">
+                        <span>System Card</span>
+                        <span class="count" id="system-count">0</span>
+                    </header>
+                    <div class="log-body" id="system-log"></div>
+                </article>
+            </div>
+        </section>
+
+        <section class="panel" id="results-section">
+            <div class="panel-head">
+                <h2 class="panel-title">Test Results</h2>
+            </div>
+            <div class="panel-body">
+                <div id="summary-bar" class="summary"></div>
+                <div id="results-wrap" class="results-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>URL</th>
+                                <th>Test Name</th>
+                                <th>Status</th>
+                                <th>Evidence</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="report-section">
+            <div class="panel-head">
+                <h2 class="panel-title">Final Report</h2>
+            </div>
+            <div class="panel-body report-wrap" id="report-wrap">
+                <pre id="report-content" class="report-content"></pre>
+            </div>
+        </section>
+    </div>
+
+    <script>
+    let eventSource = null;
+    let isRunning = false;
+    let runId = null;
+    let headlessState = null;
+    let pendingInterrupt = null;
+
+    const plannerPatterns = [
+        /planning tests for:/i,
+        /plan for .*test cases/i,
+        /primary planner failed/i,
+        /all planners failed/i,
+        /planner needs input/i,
+        /generated test cases/i,
+        /gemini planner/i,
+        /planner clarification/i
+    ];
+
+    const executorPatterns = [
+        /executing \d+ test cases/i,
+        /starting executor:/i,
+        /executor failed/i,
+        /executor crashed/i,
+        /executor task/i,
+        /test plan has no test cases/i,
+        /no test plan found/i,
+        /executor \d+\//i
+    ];
+
+    const dom = {
+        urlInput: document.getElementById('url-input'),
+        instructionsInput: document.getElementById('instructions-input'),
+        runBtn: document.getElementById('run-btn'),
+        stopBtn: document.getElementById('stop-btn'),
+        captchaOnBtn: document.getElementById('captcha-on-btn'),
+        captchaOffBtn: document.getElementById('captcha-off-btn'),
+        headlessToggleBtn: document.getElementById('headless-toggle-btn'),
+        statusLine: document.getElementById('status-line'),
+        errorBanner: document.getElementById('error-banner'),
+        plannerLog: document.getElementById('planner-log'),
+        executorLog: document.getElementById('executor-log'),
+        systemLog: document.getElementById('system-log'),
+        plannerCount: document.getElementById('planner-count'),
+        executorCount: document.getElementById('executor-count'),
+        systemCount: document.getElementById('system-count'),
+        runIdBadge: document.getElementById('run-id-badge'),
+        headlessBadge: document.getElementById('headless-badge'),
+        modeBadge: document.getElementById('mode-badge'),
+        inputPill: document.getElementById('input-pill'),
+        streamPill: document.getElementById('stream-pill'),
+        interruptPanel: document.getElementById('interrupt-panel'),
+        interruptQuestion: document.getElementById('interrupt-question'),
+        interruptAnswer: document.getElementById('interrupt-answer'),
+        submitInterruptBtn: document.getElementById('submit-interrupt-btn'),
+        resultsSection: document.getElementById('results-section'),
+        resultsWrap: document.getElementById('results-wrap'),
+        resultsBody: document.getElementById('results-body'),
+        summaryBar: document.getElementById('summary-bar'),
+        reportSection: document.getElementById('report-section'),
+        reportWrap: document.getElementById('report-wrap'),
+        reportContent: document.getElementById('report-content')
+    };
+
+    const counts = {
+        planner: 0,
+        executor: 0,
+        system: 0
+    };
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = String(text || '');
+        return div.innerHTML;
+    }
+
+    function formatTs(rawTs) {
+        try {
+            if (!rawTs) {
+                return new Date().toISOString().replace('T', ' ').slice(0, 19);
+            }
+            const d = new Date(rawTs);
+            if (isNaN(d.getTime())) {
+                return String(rawTs);
+            }
+            return d.toISOString().replace('T', ' ').slice(0, 19);
+        } catch (err) {
+            return 'time-error';
+        }
+    }
+
+    function setStatus(text) {
+        dom.statusLine.textContent = text;
+    }
+
+    function showError(msg) {
+        dom.errorBanner.style.display = 'block';
+        dom.errorBanner.textContent = msg;
+    }
+
+    function hideError() {
+        dom.errorBanner.style.display = 'none';
+        dom.errorBanner.textContent = '';
+    }
+
+    function updateBadges() {
+        dom.runIdBadge.textContent = 'Run: ' + (runId || 'n/a');
+        dom.headlessBadge.textContent = 'Headless: ' + (headlessState === null ? 'n/a' : (headlessState ? 'on' : 'off'));
+        dom.modeBadge.textContent = 'Mode: ' + (isRunning ? 'running' : 'idle');
+        dom.streamPill.textContent = 'SSE: ' + (eventSource ? 'connected' : 'disconnected');
+        dom.inputPill.textContent = pendingInterrupt ? 'Planner input: waiting' : 'Planner input: none pending';
+
+        const controlEnabled = Boolean(isRunning && runId);
+        dom.captchaOnBtn.disabled = !controlEnabled;
+        dom.captchaOffBtn.disabled = !controlEnabled;
+        dom.headlessToggleBtn.disabled = !controlEnabled;
+
+        if (headlessState === null) {
+            dom.headlessToggleBtn.textContent = 'Headless: n/a';
+        } else {
+            dom.headlessToggleBtn.textContent = headlessState ? 'Headless: On' : 'Headless: Off';
+        }
+    }
+
+    function setRunning(running) {
+        isRunning = running;
+        dom.runBtn.disabled = running;
+        dom.stopBtn.disabled = !running;
+
+        if (running) {
+            hideError();
+            dom.resultsSection.style.display = 'none';
+            dom.resultsWrap.style.display = 'none';
+            dom.resultsBody.innerHTML = '';
+            dom.summaryBar.style.display = 'none';
+            dom.summaryBar.textContent = '';
+            dom.reportSection.style.display = 'none';
+            dom.reportWrap.style.display = 'none';
+            dom.reportContent.textContent = '';
+            pendingInterrupt = null;
+            hideInterruptPanel();
+        }
+
+        updateBadges();
+    }
+
+    function clearLogs() {
+        dom.plannerLog.innerHTML = '';
+        dom.executorLog.innerHTML = '';
+        dom.systemLog.innerHTML = '';
+        counts.planner = 0;
+        counts.executor = 0;
+        counts.system = 0;
+        renderCounts();
+    }
+
+    function renderCounts() {
+        dom.plannerCount.textContent = String(counts.planner);
+        dom.executorCount.textContent = String(counts.executor);
+        dom.systemCount.textContent = String(counts.system);
+    }
+
+    function classifyMessage(type, content) {
+        if (type === 'interrupt') {
+            return 'planner';
+        }
+
+        const text = String(content || '');
+
+        if (plannerPatterns.some((rx) => rx.test(text))) {
+            return 'planner';
+        }
+
+        if (executorPatterns.some((rx) => rx.test(text))) {
+            return 'executor';
+        }
+
+        if (type === 'results' || type === 'report' || type === 'summary' || type === 'run' || type === 'heartbeat' || type === 'done') {
+            return 'system';
+        }
+
+        if (type === 'status') {
+            return 'system';
+        }
+
+        return 'system';
+    }
+
+    function entryClass(type) {
+        if (type === 'error') return 'entry entry-error';
+        if (type === 'interrupt') return 'entry entry-interrupt';
+        if (type === 'stderr') return 'entry entry-stderr';
+        if (type === 'stdout' || type === 'log') return 'entry entry-stdout';
+        if (type === 'status' || type === 'summary' || type === 'run' || type === 'done') return 'entry entry-status';
+        return 'entry';
+    }
+
+    function stripAnsi(text) {
+        return String(text || '').replace(/\x1B\[[0-9;]*m/g, '');
+    }
+
+    function normalizeForDisplay(text) {
+        const cleaned = stripAnsi(text);
+        return cleaned.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    }
+
+    function isCliTree(text) {
+        return /[╭╰│┏┓┗┛┣┫┡┩━]/.test(text);
+    }
+
+    function isBoxBorderLine(line) {
+        const t = (line || '').trim();
+        if (!t) return true;
+        return /^[╭╮╰╯┏┓┗┛┳┻┣┫┡┩┯┷┼━─│]+$/.test(t);
+    }
+
+    function cleanRichLines(text) {
+        const raw = normalizeForDisplay(text).split('\n');
+        const lines = [];
+        for (const rawLine of raw) {
+            const line = rawLine.trimEnd();
+            if (!line.trim()) continue;
+            if (isBoxBorderLine(line)) continue;
+
+            // For boxed lines, drop edge pipes while keeping content.
+            const unboxed = line.replace(/^\s*[│|]\s?/, '').replace(/\s?[│|]\s*$/, '');
+            const cleaned = unboxed.trimEnd();
+            if (cleaned.trim()) lines.push(cleaned);
+        }
+        return lines;
+    }
+
+    function splitSteps(text) {
+        const src = String(text || '').trim();
+        if (!src) return [];
+
+        const matches = [...src.matchAll(/(?:^|\s)(\d+)\.\s*([^\n]+?)(?=(?:\s\d+\.\s)|$)/g)];
+        if (matches.length > 0) {
+            return matches.map((m) => m[2].trim()).filter(Boolean);
+        }
+
+        return src.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    }
+
+    function formatExecutorTree(text) {
+        const lines = cleanRichLines(text);
+        if (lines.length === 0) return '';
+
+        let nameLine = '';
+        let url = '';
+        let stepsRaw = '';
+        let expected = '';
+        let inSteps = false;
+
+        for (const line of lines) {
+            const t = line.trim();
+
+            if (!nameLine && /→/.test(t) && !/^URL:/i.test(t) && !/^Steps:/i.test(t)) {
+                nameLine = t;
+                continue;
+            }
+            if (/^URL:/i.test(t)) {
+                url = t.replace(/^URL:\s*/i, '').trim();
+                inSteps = false;
+                continue;
+            }
+            if (/^Steps:/i.test(t)) {
+                inSteps = true;
+                continue;
+            }
+            if (/^Expected:/i.test(t)) {
+                expected = t.replace(/^Expected:\s*/i, '').trim();
+                inSteps = false;
+                continue;
+            }
+            if (inSteps) {
+                stepsRaw += (stepsRaw ? ' ' : '') + t;
+            } else if (expected && t && !/^🤖\s+Executor/i.test(t)) {
+                expected += ' ' + t;
+            }
+        }
+
+        if (!nameLine && !url && !stepsRaw && !expected) {
+            return '';
+        }
+
+        const testName = nameLine ? nameLine.split('→')[0].trim() : 'Executor Assignment';
+        const steps = splitSteps(stepsRaw);
+
+        const out = [];
+        out.push('Test Case #1');
+        out.push('├── Name: ' + (testName || 'Unknown'));
+        if (url) out.push('├── URL: ' + url);
+        out.push('├── Steps:');
+        if (steps.length === 0) {
+            out.push('│   └── (No steps parsed)');
+        } else {
+            for (let i = 0; i < steps.length; i++) {
+                const prefix = (i === steps.length - 1) ? '│   └── ' : '│   ├── ';
+                out.push(prefix + steps[i]);
+            }
+        }
+        out.push('└── Expected:');
+        out.push('    └── ' + (expected || 'N/A'));
+        return out.join('\n');
+    }
+
+    function parsePlannerTableRows(text) {
+        const rows = [];
+        const rawLines = normalizeForDisplay(text).split('\n');
+
+        for (const raw of rawLines) {
+            const line = raw.trimEnd();
+            if (!line.includes('│')) continue;
+
+            const chunks = line.split('│').map((c) => c.trim());
+            if (chunks.length < 6) continue;
+
+            const c0 = chunks[1] || '';
+            const c1 = chunks[2] || '';
+            const c2 = chunks[3] || '';
+            const c3 = chunks[4] || '';
+            const c4 = chunks[5] || '';
+
+            // Skip header row
+            if (/^#$/i.test(c0) && /^name$/i.test(c1)) continue;
+            if (!c0 && !c1 && !c2 && !c3 && !c4) continue;
+
+            rows.push([c0, c1, c2, c3, c4]);
+        }
+
+        return rows;
+    }
+
+    function formatPlannerTree(text) {
+        const rows = parsePlannerTableRows(text);
+        if (rows.length === 0) return '';
+
+        const tests = [];
+        let current = null;
+
+        for (const [idx, name, priority, stepsPart, expectedPart] of rows) {
+            const hasIndex = /^\d+$/.test(idx);
+            if (hasIndex) {
+                if (current) tests.push(current);
+                current = {
+                    index: idx,
+                    name: name || 'Unknown',
+                    priority: priority || 'N/A',
+                    stepsText: stepsPart || '',
+                    expected: expectedPart || ''
+                };
+                continue;
+            }
+
+            if (!current) continue;
+            if (name) current.name += ' ' + name;
+            if (priority) current.priority += ' ' + priority;
+            if (stepsPart) current.stepsText += ' ' + stepsPart;
+            if (expectedPart) current.expected += ' ' + expectedPart;
+        }
+
+        if (current) tests.push(current);
+        if (tests.length === 0) return '';
+
+        const out = [];
+        for (let t = 0; t < tests.length; t++) {
+            const tc = tests[t];
+            const steps = splitSteps(tc.stepsText);
+
+            if (t > 0) out.push('');
+            out.push('Test Case #' + (tc.index || String(t + 1)));
+            out.push('├── Name: ' + tc.name.trim());
+            out.push('├── Priority: ' + tc.priority.trim().toUpperCase());
+            out.push('├── Steps:');
+            if (steps.length === 0) {
+                out.push('│   └── (No steps parsed)');
+            } else {
+                for (let i = 0; i < steps.length; i++) {
+                    const prefix = (i === steps.length - 1) ? '│   └── ' : '│   ├── ';
+                    out.push(prefix + steps[i]);
+                }
+            }
+            out.push('└── Expected:');
+            out.push('    └── ' + (tc.expected.trim() || 'N/A'));
+        }
+
+        return out.join('\n');
+    }
+
+    function formatCliTreePayload(card, text) {
+        if (card !== 'planner' && card !== 'executor') {
+            return normalizeForDisplay(text);
+        }
+
+        const cleaned = normalizeForDisplay(text);
+        if (!isCliTree(cleaned)) return cleaned;
+
+        if (/generated test cases/i.test(cleaned)) {
+            const plannerTree = formatPlannerTree(cleaned);
+            if (plannerTree) return plannerTree;
+        }
+
+        if (/executor\s+\d+\/\d+/i.test(cleaned) || /→/.test(cleaned)) {
+            const executorTree = formatExecutorTree(cleaned);
+            if (executorTree) return executorTree;
+        }
+
+        const lines = cleanRichLines(cleaned);
+        return lines.length > 0 ? lines.join('\n') : cleaned;
+    }
+
+    function markdownToPlainText(markdown) {
+        let text = normalizeForDisplay(markdown || '');
+
+        // Remove fenced code block markers but keep code body.
+        text = text.replace(/```[\w-]*\n?/g, '');
+
+        // Convert links: [label](url) -> label (url)
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
+
+        // Convert images: ![alt](url) -> [Image: alt] (url)
+        text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '[Image: $1] ($2)');
+
+        // Headings: keep text only.
+        text = text.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+
+        // Blockquote markers.
+        text = text.replace(/^\s{0,3}>\s?/gm, '');
+
+        // Bold/italic/inline code markers.
+        text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+        text = text.replace(/__([^_]+)__/g, '$1');
+        text = text.replace(/\*([^*]+)\*/g, '$1');
+        text = text.replace(/_([^_]+)_/g, '$1');
+        text = text.replace(/`([^`]+)`/g, '$1');
+
+        // Horizontal rules.
+        text = text.replace(/^\s*([-*_])\1{2,}\s*$/gm, '');
+
+        // Unordered list markers.
+        text = text.replace(/^\s*[-*+]\s+/gm, '- ');
+
+        // Normalize numbered lists to "1. " style.
+        text = text.replace(/^\s*\d+[.)]\s+/gm, '1. ');
+
+        // Collapse excessive blank lines.
+        text = text.replace(/\n{3,}/g, '\n\n');
+
+        return text.trim();
+    }
+
+    function appendLog(card, type, content, timestamp) {
+        if (!content || !String(content).trim()) {
+            return;
+        }
+
+        let target = dom.systemLog;
+        if (card === 'planner') target = dom.plannerLog;
+        if (card === 'executor') target = dom.executorLog;
+
+        const normalized = formatCliTreePayload(card, content);
+        const safeContent = escapeHtml(normalized).replace(/\n/g, '<br>');
+        const line = document.createElement('div');
+        line.className = entryClass(type) + (isCliTree(normalized) ? ' entry-tree' : '');
+        line.innerHTML = '<span class="entry-time">[' + escapeHtml(formatTs(timestamp)) + ']</span>' + safeContent;
+        target.appendChild(line);
+        target.scrollTop = target.scrollHeight;
+
+        counts[card] += 1;
+        renderCounts();
+    }
+
+    function showInterruptPanel(question, url) {
+        pendingInterrupt = {
+            question: question || '',
+            url: url || ''
+        };
+
+        dom.interruptQuestion.textContent = (question || 'Planner is asking for extra details.') + (url ? (' (URL: ' + url + ')') : '');
+        dom.interruptAnswer.placeholder = question ? ('Answer: ' + question) : 'Provide any details the planner needs...';
+        dom.interruptAnswer.value = '';
+        dom.interruptPanel.style.display = 'block';
+        dom.submitInterruptBtn.disabled = false;
+        dom.interruptAnswer.focus();
+        updateBadges();
+    }
+
+    function hideInterruptPanel() {
+        pendingInterrupt = null;
+        dom.interruptPanel.style.display = 'none';
+        dom.interruptQuestion.textContent = '';
+        dom.interruptAnswer.value = '';
+        dom.submitInterruptBtn.disabled = false;
+        updateBadges();
+    }
+
+    async function postJson(url, payload) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload ? JSON.stringify(payload) : '{}'
+        });
+
+        if (!response.ok) {
+            let detail = 'Request failed';
+            try {
+                const body = await response.json();
+                detail = body.detail || JSON.stringify(body);
+            } catch (err) {
+                detail = response.status + ' ' + response.statusText;
+            }
+            throw new Error(detail);
+        }
+
+        return response.json();
+    }
+
+    async function submitPlannerAnswer() {
+        if (!runId) {
+            showError('No active run id. Start a run first.');
+            return;
+        }
+
+        if (!pendingInterrupt) {
+            showError('No pending planner clarification.');
+            return;
+        }
+
+        dom.submitInterruptBtn.disabled = true;
+
+        try {
+            const answer = dom.interruptAnswer.value || '';
+            await postJson('/api/runs/' + encodeURIComponent(runId) + '/respond', { answer: answer });
+            hideInterruptPanel();
+        } catch (err) {
+            showError('Failed to submit planner answer: ' + err.message);
+            dom.submitInterruptBtn.disabled = false;
+        }
+    }
+
+    async function setHeadless(headless) {
+        if (!runId) {
+            showError('No active run id. Start a run first.');
+            return;
+        }
+
+        try {
+            const res = await postJson('/api/runs/' + encodeURIComponent(runId) + '/headless', { headless: headless });
+            headlessState = !!res.headless_after;
+            updateBadges();
+        } catch (err) {
+            showError('Headless update failed: ' + err.message);
+        }
+    }
+
+    async function toggleHeadless() {
+        if (headlessState === null) {
+            showError('Headless state not available yet.');
+            return;
+        }
+        await setHeadless(!headlessState);
+    }
+
+    async function enableCaptchaMode() {
+        if (!runId) {
+            showError('No active run id. Start a run first.');
+            return;
+        }
+
+        try {
+            const res = await postJson('/api/runs/' + encodeURIComponent(runId) + '/captcha/start');
+            headlessState = !!res.headless_after;
+            updateBadges();
+        } catch (err) {
+            showError('Could not enable captcha mode: ' + err.message);
+        }
+    }
+
+    async function restoreAfterCaptcha() {
+        if (!runId) {
+            showError('No active run id. Start a run first.');
+            return;
+        }
+
+        try {
+            const res = await postJson('/api/runs/' + encodeURIComponent(runId) + '/captcha/solved');
+            headlessState = !!res.headless_after;
+            updateBadges();
+        } catch (err) {
+            showError('Could not restore mode after captcha: ' + err.message);
+        }
+    }
+
+    function renderResults(reports) {
+        dom.resultsBody.innerHTML = '';
+
+        if (!reports || reports.length === 0) {
+            appendLog('system', 'status', 'No test reports received.', new Date().toISOString());
+            return;
+        }
+
+        let totalPass = 0;
+        let totalFail = 0;
+        let totalError = 0;
+
+        for (const report of reports) {
+            const reportUrl = report.url || '?';
+            const results = report.results || [];
+
+            for (const r of results) {
+                const row = document.createElement('tr');
+                const status = String(r.status || 'skip').toLowerCase();
+                const duration = Number(r.duration_seconds || 0);
+
+                row.innerHTML =
+                    '<td>' + escapeHtml(reportUrl) + '</td>' +
+                    '<td>' + escapeHtml(r.test_name || '?') + '</td>' +
+                    '<td class="status-' + escapeHtml(status) + '">' + escapeHtml(status.toUpperCase()) + '</td>' +
+                    '<td>' + escapeHtml(r.evidence || r.error_detail || '-') + '</td>' +
+                    '<td>' + (duration > 0 ? duration.toFixed(1) + 's' : '-') + '</td>';
+
+                dom.resultsBody.appendChild(row);
+
+                if (status === 'pass') totalPass += 1;
+                else if (status === 'fail') totalFail += 1;
+                else if (status === 'error') totalError += 1;
+            }
+        }
+
+        dom.summaryBar.textContent = 'Total: ' + totalPass + ' pass, ' + totalFail + ' fail, ' + totalError + ' error';
+        dom.summaryBar.style.display = 'block';
+        dom.resultsSection.style.display = 'block';
+        dom.resultsWrap.style.display = 'block';
+    }
+
+    function handleMessage(data) {
+        const type = data.type || 'unknown';
+        const content = data.content || '';
+        const stamp = data.timestamp || new Date().toISOString();
+
+        if (type === 'heartbeat') {
+            return;
+        }
+
+        if (type === 'run') {
+            runId = data.run_id || runId;
+            appendLog('system', type, 'Run session initialized with id: ' + (runId || '?'), stamp);
+            updateBadges();
+            return;
+        }
+
+        if (typeof data.headless !== 'undefined') {
+            headlessState = !!data.headless;
+            updateBadges();
+        }
+
+        if (type === 'interrupt') {
+            const question = data.question || content;
+            const url = data.url || '';
+            showInterruptPanel(question, url);
+            appendLog('planner', type, content, stamp);
+            setStatus('Planner is waiting for your input.');
+            return;
+        }
+
+        if (type === 'status') {
+            setStatus(content);
+        }
+
+        if (type === 'error') {
+            showError('Agent error: ' + content);
+        }
+
+        if (type === 'results') {
+            try {
+                const reports = data.reports || JSON.parse(content);
+                renderResults(reports);
+            } catch (err) {
+                showError('Failed to render results: ' + err.message);
+            }
+        }
+
+        if (type === 'report') {
+            dom.reportContent.textContent = markdownToPlainText(content);
+            dom.reportSection.style.display = 'block';
+            dom.reportWrap.style.display = 'block';
+        }
+
+        if (type === 'done') {
+            setStatus('Run complete.');
+            setRunning(false);
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            hideInterruptPanel();
+        }
+
+        const card = classifyMessage(type, content);
+        appendLog(card, type, content, stamp);
+    }
+
+    function startRun() {
+        const url = (dom.urlInput.value || '').trim();
+        if (!url) {
+            showError('Please enter a target URL.');
+            return;
+        }
+
+        try {
+            new URL(url);
+        } catch (err) {
+            showError('Invalid URL. Use http:// or https://');
+            return;
+        }
+
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+
+        clearLogs();
+        hideError();
+        runId = null;
+        headlessState = null;
+        hideInterruptPanel();
+        setRunning(true);
+        setStatus('Connecting...');
+        updateBadges();
+
+        const params = new URLSearchParams({
+            url: url,
+            instructions: (dom.instructionsInput.value || '').trim()
+        });
+
+        eventSource = new EventSource('/api/run?' + params.toString());
+
+        eventSource.onopen = function () {
+            setStatus('Connected. Running pipeline...');
+            updateBadges();
+        };
+
+        eventSource.onmessage = function (event) {
+            try {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            } catch (err) {
+                appendLog('system', 'error', 'Failed to parse SSE message.', new Date().toISOString());
+                showError('Message parse error: ' + err.message);
+            }
+        };
+
+        eventSource.onerror = function () {
+            if (!eventSource) {
+                return;
+            }
+
+            if (eventSource.readyState === EventSource.CONNECTING) {
+                setStatus('Connection interrupted. Reconnecting...');
+                updateBadges();
+                return;
+            }
+
+            showError('SSE stream closed unexpectedly.');
+            setStatus('Disconnected.');
+            setRunning(false);
+            updateBadges();
+
+            try {
+                eventSource.close();
+            } catch (err) {
+                // ignore
+            }
+            eventSource = null;
+            updateBadges();
+        };
+    }
+
+    function stopRun() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+
+        setStatus('Stream closed locally. Backend run may still continue.');
+        setRunning(false);
+        updateBadges();
+    }
+
+    renderCounts();
+    updateBadges();
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# .gitignore
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+.pytest_cache/
+.env
+*.egg-info/
+dist/
+build/
+.venv/
+report.md
+test.md
+
+# Internal project files
+tasks/
+.github/
+plan-autonomousWebsiteTestingAgent.prompt.md
+uv.lock
+config.yaml

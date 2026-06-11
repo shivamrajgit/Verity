@@ -1,0 +1,5 @@
+# Existing project dependencies are in pyproject.toml — install with: pip install -e .
+# The lines below are additional dependencies for the web frontend server.
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sse-starlette>=2.1.0
