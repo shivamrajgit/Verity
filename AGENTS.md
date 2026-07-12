@@ -1,41 +1,82 @@
-# Repository Guidelines
+# Verity Repository Guidelines
 
-## Project Structure & Module Organization
+## Project Structure
 
-- `src/` contains the Python application. `src/main.py` is the CLI entry point; `src/graph/` builds the LangGraph workflow and its planning, execution, approval, queue, and summarization nodes.
-- `src/llm/` contains provider integrations and the LLM factory. `src/models/` contains Pydantic state and result schemas; `src/utils/` contains URL and fallback helpers.
-- `server.py` provides the FastAPI/SSE web UI backend, with frontend assets in `static/`.
-- `tests/` is the pytest location. Add new tests there; keep reusable application code under `src/`.
-- `config.yaml` and `.env.example` document runtime configuration. Generated reports such as `report.md` should remain uncommitted.
+- `src/main.py` is the CLI entry point; the installed command is `verity`.
+- `src/graph/` contains the LangGraph planning, execution, approval, queue, compile, and summarization nodes.
+- `src/llm/` contains provider integrations, retry handling, direct chat, and the LLM factory.
+- `src/models/` contains Pydantic state, test-plan, executor-result, and report schemas.
+- `src/utils/` contains URL normalization, target security validation, and safe fallback helpers.
+- `server.py` provides the FastAPI/SSE backend; frontend assets are in `static/`.
+- `tests/` contains pytest coverage for configuration, security, routing, provider fallbacks, planner repair, reports, and server behavior.
+- `config.yaml` and `.env.example` document runtime configuration. Generated `report.md` and `reports/` output must remain uncommitted.
 
-## Build, Test, and Development Commands
+## Runtime and Setup
 
-Run these from the repository root:
+The project requires Python 3.12 or 3.13, `uv`, and Playwright Chromium:
 
 ```bash
-make develop       # Create/sync the uv environment and dev dependencies
+make develop
 uv run playwright install chromium
-make check         # Run lint and tests
-make format        # Format and auto-fix Ruff findings
-make run           # Run the CLI with config.yaml
-make run-auto      # Run the CLI with automatic approvals
-python server.py   # Start the web UI at http://localhost:8000
 ```
 
-Use `make test` for verbose pytest runs, `make test-slow` for the extended timeout, and `make clean` to remove caches.
+Copy `.env.example` to `.env` and add only the provider keys needed for the selected configuration. The default provider is OpenRouter Auto Router:
 
-## Coding Style & Naming Conventions
+- `OPENROUTER_API_KEY` powers the default planner, executor, summarizer, and fallback.
+- `GOOGLE_API_KEY` is needed only when using the `--gemini` CLI override.
+- Optional providers are documented in `.env.example` and validated by `src/config.py`.
 
-Use Python 3.11+, four-space indentation, type hints, and small focused functions. Ruff is the formatter and linter (`line-length = 100`); run `make format` before submitting. Use `snake_case` for functions, variables, and modules; `PascalCase` for classes and Pydantic models; and descriptive names for graph nodes and provider roles.
+## Build, Test, and Run Commands
+
+Run commands from the repository root:
+
+```bash
+make develop
+uv run playwright install chromium
+make check                         # Ruff plus the full pytest suite
+make format                        # Format and auto-fix Ruff findings
+make test                          # Verbose pytest run
+make test-slow                     # Extended-timeout pytest run
+make run                           # CLI with config.yaml and Auto Router
+make run ARGS=--gemini             # One run with Gemini, Auto Router fallback
+make run-auto                      # CLI with automatic approvals
+make run-auto ARGS=--gemini        # Auto-approve plus Gemini override
+uv run verity --help               # Installed CLI entry point
+python server.py                   # Web UI at http://localhost:8000
+make clean                         # Remove local caches and bytecode
+```
+
+The CLI also supports `--config`, `--url`, `--urls`, `--instructions`,
+`--auto-approve`, `--verbose`, and the case-insensitive alias `--Gemini`.
+
+## LLM and Planner Behavior
+
+- `config.yaml` uses `openrouter/auto` for all default LLM roles.
+- OpenRouter planner calls request a structured Pydantic `TestPlan` response.
+- The planner repairs safe shape errors such as code fences, string sub-pages, missing defaults, and invalid priorities, then rejects plans without actionable steps.
+- Provider failures use bounded retries and configured failover. Gemini runs use OpenRouter Auto Router as their fallback.
+- The executor uses bounded browser steps, conservative action prompts, and does not invent credentials or irreversible data.
+- Reports retain deterministic pass/fail/error counts even when narrative summarization fails.
+
+## Coding Style
+
+Use four-space indentation, type hints, and small focused functions. Ruff is the formatter and linter with a 100-character line limit. Use `snake_case` for functions, variables, and modules; `PascalCase` for classes and Pydantic models; and descriptive names for graph nodes and provider roles.
 
 ## Testing Guidelines
 
-Tests use pytest with `pytest-asyncio` in auto mode. Name files `test_*.py` and test functions `test_*`; cover URL/config helpers, model validation, graph routing, and provider fallbacks without making live API or browser calls. Run `make test` locally and `make check` before opening a PR.
+Tests use pytest with `pytest-asyncio` in auto mode. Name files `test_*.py` and functions `test_*`. Keep unit tests deterministic and avoid live API or browser calls in the test suite. When changing planner schemas, provider routing, security validation, or server controls, add regression coverage in `tests/`.
 
-## Commit & Pull Request Guidelines
+## Server and Security Configuration
 
-Existing history uses concise version-style subjects such as `1.0` and `1.0.1`. Match that style for release/version commits; otherwise use a short imperative subject, for example `Fix planner fallback`. PRs should explain the behavior change, list validation commands, link any relevant issue, and include a screenshot or short UI notes when changing `static/` or `server.py`.
+The server binds to localhost by default. For deployment, use an authenticated reverse proxy or configure:
 
-## Security & Configuration Tips
+- `VERITY_API_TOKEN` and `VERITY_REQUIRE_API_TOKEN=true` to protect run/control endpoints.
+- `VERITY_HOST` and `VERITY_PORT` to control the bind address and port.
+- `VERITY_REPORT_DIR` for generated server reports.
+- `VERITY_SESSION_TTL_SECONDS` and `VERITY_MAX_ACTIVE_RUNS` for session retention and concurrency limits.
 
-Copy `.env.example` to `.env` and keep API keys out of Git. Update `config.yaml` for target URLs, model providers, concurrency, approval mode, and browser visibility; use a safe test target and avoid committing personal or generated reports.
+Keep `allow_private_targets: false` unless trusted local development requires private targets. Use `allowed_target_domains` to restrict scope, keep API keys out of Git, and never commit `.env`, reports, or personal test data.
+
+## Commits and Pull Requests
+
+Existing history uses concise version-style subjects such as `1.0`, `1.0.1`, and `1.0.2`. Match that style for release/version commits; otherwise use a short imperative subject. Pull requests should explain behavior changes, list validation commands, link relevant issues, and include UI notes or screenshots when changing `static/` or `server.py`.

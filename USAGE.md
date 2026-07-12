@@ -2,18 +2,19 @@
 
 ## Prerequisites
 
-- Python 3.11+
-- The base Verity project installed (`pip install -e .` from the repo root)
-- A valid `.env` file with your API keys (see `.env.example`)
+- Python 3.12 or 3.13
+- The Verity environment prepared with `make develop`
+- A valid `.env` file with your provider API key (see `.env.example`)
 - A valid `config.yaml` (the default one ships with the repo)
 
-## Install Frontend Dependencies
+## Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+make develop
+uv run playwright install chromium
 ```
 
-This installs FastAPI, Uvicorn, and SSE-Starlette on top of the existing project dependencies.
+The project dependencies, including FastAPI, Uvicorn, and SSE-Starlette, are declared in `pyproject.toml` and installed by `make develop`.
 
 ## Start the Server
 
@@ -41,19 +42,22 @@ The server starts on `http://localhost:8000`.
 - It calls the exact same LangGraph graph, LLM providers, and browser-use agents as the CLI.
 - All output is streamed via Server-Sent Events (SSE) to the browser.
 - The approval mode is forced to `auto_approve` so no interactive prompts are needed.
-- No existing agent code is modified.
+- Runs use the OpenRouter Auto Router configuration from `config.yaml` by default.
 
 ## Troubleshooting
 
 - **Blank log panel / no output**: Open browser DevTools (F12) → Console tab. Every SSE message is logged to `console.log`. Check for connection errors.
 - **"SSE connection closed unexpectedly"**: The server may have crashed. Check the terminal where `python server.py` is running for tracebacks.
 - **Config errors**: Make sure `config.yaml` exists in the repo root and is valid. API keys must be set in `.env`.
-- **Module not found errors**: Run `pip install -e .` to install the base project, then `pip install -r requirements.txt` for server dependencies.
+- **Module not found errors**: Run `make develop` and `uv run playwright install chromium`.
+- **Authentication errors**: Configure `VERITY_API_TOKEN` and `VERITY_REQUIRE_API_TOKEN=true` when protecting a deployed server.
 
-## CLI Still Works
+## CLI Usage
 
-The original CLI is unchanged. You can still run:
+The CLI is available as `verity`:
 
 ```bash
-python -m src.main --config config.yaml --url https://example.com -i "test the login"
+uv run verity --config config.yaml --url https://example.com -i "test the login"
 ```
+
+Use `make run ARGS=--gemini` for a one-off Gemini run; OpenRouter Auto Router remains the fallback.

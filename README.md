@@ -1,22 +1,18 @@
 # Verity
 
-Verity is an autonomous website testing agent for quick QA checks.
-Give it a target URL and it will plan tests, run them in a browser, and create a final report.
-It can discover useful sub-pages, test them in parallel, and summarize issues in simple Markdown output.
+Verity is an autonomous website QA agent. Give it a target URL and it plans browser tests, executes them, discovers useful sub-pages, and writes a deterministic Markdown report with optional LLM narrative findings.
 
-This project supports both:
-- CLI runs for terminal-based workflows
-- A frontend web UI for live logs and controls while the run is in progress
+It supports both a terminal CLI and a FastAPI/SSE web UI for live run status, logs, results, and reports.
 
 ## Tech Stack
 
-Built with Python, LangGraph, browser-use, Playwright, and FastAPI.
+Python 3.12–3.13, LangGraph, browser-use, Playwright, Pydantic, FastAPI, SSE-Starlette, and configurable LLM providers.
 
 ## Prerequisites
 
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) installed
-- A `.env` file with required API keys
+- Python 3.12 or 3.13
+- [uv](https://docs.astral.sh/uv/)
+- A `.env` file with the API key for the provider you use
 
 ## Installation
 
@@ -25,93 +21,108 @@ make develop
 uv run playwright install chromium
 ```
 
-## Setup
-
-1. Create your env file:
+Create local environment configuration:
 
 ```bash
-cp .env.example .env
+copy .env.example .env       # PowerShell
+# cp .env.example .env       # macOS/Linux
 ```
 
-2. Edit `config.yaml`:
+The default configuration uses OpenRouter Auto Router for the planner, executor, summarizer, and fallback. Set:
 
-- Set your `target_url`
-- Choose planner, executor, and summarizer models
-- Adjust `depth`, `concurrency`, and `browser.headless` if needed
+```text
+OPENROUTER_API_KEY=sk-or-...
+```
 
-## Run (CLI)
+The optional `--gemini` override uses `GOOGLE_API_KEY` instead and keeps OpenRouter Auto Router as fallback.
 
-Use your config settings:
+## Configuration
+
+Edit `config.yaml` to change:
+
+- `target_url` and `extra_urls`
+- LLM providers and models
+- concurrency, browser step limits, and timeouts
+- approval mode and recursion depth
+- report output path
+- private-target and allowed-domain security policies
+
+The normal provider configuration is:
+
+```yaml
+provider: openrouter
+model: openrouter/auto
+api_key_env: OPENROUTER_API_KEY
+```
+
+OpenRouter planner calls request structured `TestPlan` output. The planner also repairs safe formatting/schema variations from routed models and rejects plans without actionable test steps. The executor and summarizer have bounded retries and provider fallbacks.
+
+## CLI Usage
+
+Run with the repository configuration:
 
 ```bash
 make run
 ```
 
-Force auto-approve mode:
+Run with automatic approvals:
 
 ```bash
 make run-auto
 ```
 
-The default provider is OpenRouter's Auto Router. To use Gemini for the
-planner, executor, and summarizer for one run, pass:
+Use Gemini for one run:
 
 ```bash
-uv run python -m src.main --config config.yaml --gemini
+make run ARGS=--gemini
 ```
 
-(`--Gemini` is accepted as an alias.) Gemini runs keep OpenRouter Auto Router
-as their fallback provider.
-
-With Make, use `make run ARGS=--gemini`.
-
-A final report is written to the configured report path (default: `report.md`).
-
-## Provider Config Format
-
-Each LLM entry in `config.yaml` uses this shape:
-
-```yaml
-provider: openrouter
-model: openrouter/auto
-base_url: null
-api_key_env: OPENROUTER_API_KEY
-```
-
-`provider` and `model` are required. `base_url` and `api_key_env` are optional.
-
-## Frontend Setup
-
-Install frontend server dependencies:
+Direct CLI usage:
 
 ```bash
-pip install -r requirements.txt
+uv run verity --config config.yaml --url https://example.com \
+  --instructions "Test the main navigation" --auto-approve
 ```
 
-## Run (Frontend)
+Available overrides include `--config`, `--url`, `--urls`, `--instructions`/`-i`, `--auto-approve`, `--verbose`/`-v`, and `--gemini` (with `--Gemini` accepted as an alias).
 
-Start the web server:
+A run returns a nonzero exit code when the pipeline fails, no reports are generated, or any test has `fail` or `error` status.
+
+## Web UI
+
+Start the server:
 
 ```bash
 python server.py
 ```
 
-Then open:
+Open <http://localhost:8000>. The UI can:
+
+- accept a target URL and optional instructions
+- stream planner, executor, and system logs through SSE
+- submit planner clarification answers
+- cancel active runs
+- display structured results and the final Markdown report
+
+For deployment, keep the server behind an authenticated reverse proxy or configure:
 
 ```text
-http://localhost:8000
+VERITY_API_TOKEN=replace-with-a-long-random-token
+VERITY_REQUIRE_API_TOKEN=true
+VERITY_HOST=127.0.0.1
+VERITY_PORT=8000
+VERITY_REPORT_DIR=reports
+VERITY_SESSION_TTL_SECONDS=3600
+VERITY_MAX_ACTIVE_RUNS=2
 ```
 
-For a deployed server, keep the application bound to localhost behind an
-authenticated reverse proxy, or set `VERITY_API_TOKEN` and
-`VERITY_REQUIRE_API_TOKEN=true`. Target URLs are checked against private-IP
-and domain policies before a browser is launched.
+The server rejects private or loopback targets by default. Configure `security.allow_private_targets` only for trusted local development, and use `security.allowed_target_domains` to restrict target scope.
 
-From the UI you can:
-- Enter target URL and optional instructions
-- Stream planner/executor/system logs live
-- Submit planner clarification answers
-- View test results and the final report
+## Reports and Outputs
+
+CLI reports default to `report.md`. Server runs write isolated reports under `reports/`. Reports include deterministic totals for pass, fail, error, skipped, and observed provider cost, plus an optional `LLM Narrative` section.
+
+Generated reports, `.env`, caches, bytecode, and build artifacts are ignored by Git.
 
 ## Development
 
@@ -120,10 +131,8 @@ make check
 make lint
 make format
 make test
+make test-slow
 make clean
 ```
 
-## Output
-
-Verity generates a Markdown report with pass/fail/error results and findings summary.
-By default, it is written to `report.md` (or the path set in your config).
+The test suite covers configuration validation, target security, planner schema repair, provider fallbacks, graph behavior, deterministic reports, and server controls without making live API or browser calls.
