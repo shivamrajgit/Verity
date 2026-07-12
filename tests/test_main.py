@@ -18,7 +18,7 @@ def test_gemini_flag_overrides_all_roles_and_keeps_openrouter_fallback() -> None
 
 
 def test_gemini_flag_is_available_in_cli(monkeypatch) -> None:
-    monkeypatch.setattr(sys, "argv", ["cragent", "--Gemini"])
+    monkeypatch.setattr(sys, "argv", ["verity", "--Gemini"])
 
     args = parse_args()
 

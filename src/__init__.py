@@ -1,1 +1,1 @@
-"""Autonomous Website Testing Agent."""
+"""Verity autonomous website testing agent."""

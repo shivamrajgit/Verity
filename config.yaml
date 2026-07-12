@@ -1,4 +1,4 @@
-# ── Autonomous Website Testing Agent Configuration ──
+# ── Verity Autonomous Website QA Configuration ──
 
 target_url: "https://books.toscrape.com/"
 

@@ -47,20 +47,20 @@ for _stream in (sys.stdout, sys.stderr):
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-REPORT_DIR = Path(os.environ.get("CRAGENT_REPORT_DIR", BASE_DIR / "reports")).resolve()
-SESSION_TTL_SECONDS = int(os.environ.get("CRAGENT_SESSION_TTL_SECONDS", "3600"))
-MAX_ACTIVE_RUNS = int(os.environ.get("CRAGENT_MAX_ACTIVE_RUNS", "2"))
+REPORT_DIR = Path(os.environ.get("VERITY_REPORT_DIR", BASE_DIR / "reports")).resolve()
+SESSION_TTL_SECONDS = int(os.environ.get("VERITY_SESSION_TTL_SECONDS", "3600"))
+MAX_ACTIVE_RUNS = int(os.environ.get("VERITY_MAX_ACTIVE_RUNS", "2"))
 
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
-app = FastAPI(title="Cragent Web UI", version="0.1.0")
+app = FastAPI(title="Verity Web UI", version="0.1.0")
 
 # Serve static files (index.html lives in static/)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 logger = logging.getLogger(__name__)
 RUN_CONTEXT: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "cragent_run_context", default=None
+    "verity_run_context", default=None
 )
 
 
@@ -74,11 +74,11 @@ def _require_api_token(request: Request) -> None:
     """Require an API token when configured for a deployed server.
 
     Local development remains convenient when no token is configured, while
-    production deployments can set CRAGENT_API_TOKEN and protect every run
+    production deployments can set VERITY_API_TOKEN and protect every run
     and control endpoint without exposing secrets in query parameters.
     """
-    expected = os.environ.get("CRAGENT_API_TOKEN", "")
-    required = os.environ.get("CRAGENT_REQUIRE_API_TOKEN", "").lower() in {
+    expected = os.environ.get("VERITY_API_TOKEN", "")
+    required = os.environ.get("VERITY_REQUIRE_API_TOKEN", "").lower() in {
         "1",
         "true",
         "yes",
@@ -822,14 +822,14 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
 
-    host = os.environ.get("CRAGENT_HOST", "127.0.0.1")
-    if host not in {"127.0.0.1", "localhost", "::1"} and not os.environ.get("CRAGENT_API_TOKEN"):
-        raise RuntimeError("CRAGENT_API_TOKEN is required when binding beyond localhost")
-    print(f"[{_timestamp()}] Starting Cragent Web UI server...")
+    host = os.environ.get("VERITY_HOST", "127.0.0.1")
+    if host not in {"127.0.0.1", "localhost", "::1"} and not os.environ.get("VERITY_API_TOKEN"):
+        raise RuntimeError("VERITY_API_TOKEN is required when binding beyond localhost")
+    print(f"[{_timestamp()}] Starting Verity Web UI server...")
     print(f"[{_timestamp()}] Open http://localhost:8000 in your browser")
     uvicorn.run(
         app,
         host=host,
-        port=int(os.environ.get("CRAGENT_PORT", "8000")),
+        port=int(os.environ.get("VERITY_PORT", "8000")),
         log_level="info",
     )

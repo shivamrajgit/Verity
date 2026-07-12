@@ -1,4 +1,4 @@
-"""CLI entry point for the Autonomous Website Testing Agent."""
+"""CLI entry point for Verity, the autonomous website testing agent."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def setup_logging() -> None:
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Autonomous Website Testing Agent",
+        description="Verity — Autonomous Website Testing Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -170,12 +170,12 @@ async def run_agent(args: argparse.Namespace) -> int:
 
     console.print(
         Panel.fit(
-            f"[bold blue]Autonomous Website Testing Agent[/bold blue]\n"
+            f"[bold blue]Verity Autonomous Website Testing Agent[/bold blue]\n"
             f"Target: [green]{target_url}[/green]\n"
             f"Max depth: {config.depth.max_depth} | "
             f"Max executors: {config.concurrency.max_executors} | "
             f"Approval: {config.approval.mode}",
-            title="🧪 Web Test Agent",
+            title="🧪 Verity Web Test Agent",
         )
     )
 

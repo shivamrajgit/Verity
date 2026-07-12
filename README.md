@@ -1,6 +1,6 @@
-# Cragent
+# Verity
 
-Cragent is an autonomous website testing agent for quick QA checks.
+Verity is an autonomous website testing agent for quick QA checks.
 Give it a target URL and it will plan tests, run them in a browser, and create a final report.
 It can discover useful sub-pages, test them in parallel, and summarize issues in simple Markdown output.
 
@@ -103,8 +103,8 @@ http://localhost:8000
 ```
 
 For a deployed server, keep the application bound to localhost behind an
-authenticated reverse proxy, or set `CRAGENT_API_TOKEN` and
-`CRAGENT_REQUIRE_API_TOKEN=true`. Target URLs are checked against private-IP
+authenticated reverse proxy, or set `VERITY_API_TOKEN` and
+`VERITY_REQUIRE_API_TOKEN=true`. Target URLs are checked against private-IP
 and domain policies before a browser is launched.
 
 From the UI you can:
@@ -125,5 +125,5 @@ make clean
 
 ## Output
 
-Cragent generates a Markdown report with pass/fail/error results and findings summary.
+Verity generates a Markdown report with pass/fail/error results and findings summary.
 By default, it is written to `report.md` (or the path set in your config).

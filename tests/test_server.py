@@ -22,7 +22,7 @@ def test_server_rejects_config_traversal() -> None:
 
 
 def test_protected_endpoints_require_configured_token(monkeypatch) -> None:
-    monkeypatch.setenv("CRAGENT_API_TOKEN", "test-token")
+    monkeypatch.setenv("VERITY_API_TOKEN", "test-token")
     client = TestClient(app)
 
     assert client.get("/api/health").status_code == 200

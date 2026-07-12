@@ -1,5 +1,5 @@
 [project]
-name = "web-test-agent"
+name = "verity"
 version = "0.1.0"
 description = "Autonomous website testing agent using browser-use and LangGraph"
 requires-python = ">=3.12,<3.14"
@@ -31,7 +31,7 @@ dev = [
 ]
 
 [project.scripts]
-web-test-agent = "src.main:main"
+verity = "src.main:main"
 
 [build-system]
 requires = ["hatchling"]

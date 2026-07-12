@@ -1,9 +1,9 @@
-# Cragent Web UI — Usage Guide
+# Verity Web UI — Usage Guide
 
 ## Prerequisites
 
 - Python 3.11+
-- The base Cragent project installed (`pip install -e .` from the repo root)
+- The base Verity project installed (`pip install -e .` from the repo root)
 - A valid `.env` file with your API keys (see `.env.example`)
 - A valid `config.yaml` (the default one ships with the repo)
 
