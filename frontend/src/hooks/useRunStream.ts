@@ -53,6 +53,9 @@ type Action =
   | { kind: "clear-logs" }
   | { kind: "answered" }
   | { kind: "headless"; value: boolean }
+  | { kind: "load-mock-start" }
+  | { kind: "load-mock-progress"; statusLine: string; logItem: LogItem }
+  | { kind: "load-mock-done"; summary: Summary; reports: PlannerReport[]; reportMarkdown: string; logItems: LogItem[] }
   | { kind: "reset" };
 
 function summarize(reports: PlannerReport[]): Summary {
@@ -192,6 +195,35 @@ function reducer(state: RunState, action: Action): RunState {
       return { ...state, headless: action.value };
     case "reset":
       return initialState;
+    case "load-mock-start":
+      return {
+        ...initialState,
+        phase: "running",
+        target: "https://demo.verity.qa",
+        headless: true,
+        statusLine: "Initializing planner node with screenshot...",
+        startedAt: Date.now(),
+        logs: [
+          { id: 1, source: "system", type: "status", content: "Starting Verity pipeline runner...", ts: new Date().toISOString() },
+        ],
+      };
+    case "load-mock-progress":
+      return {
+        ...state,
+        statusLine: action.statusLine,
+        logs: [...state.logs, action.logItem],
+      };
+    case "load-mock-done":
+      return {
+        ...state,
+        phase: "done",
+        statusLine: "Demo run completed successfully.",
+        finishedAt: Date.now(),
+        summary: action.summary,
+        logs: [...state.logs, ...action.logItems],
+        reports: action.reports,
+        reportMarkdown: action.reportMarkdown,
+      };
     default:
       return state;
   }
@@ -290,6 +322,110 @@ export function useRunStream() {
     dispatch({ kind: "reset" });
   }, [closeStream]);
 
+  const loadMockData = useCallback(() => {
+    dispatch({ kind: "load-mock-start" });
+
+    setTimeout(() => {
+      dispatch({
+        kind: "load-mock-progress",
+        statusLine: "Planning: scanned 2 pages; generated 5 browser test actions...",
+        logItem: { id: 2, source: "planner", type: "status", content: "Scanned pages: / and /dashboard", ts: new Date().toISOString() },
+      });
+    }, 2000);
+
+    setTimeout(() => {
+      dispatch({
+        kind: "load-mock-progress",
+        statusLine: "Executor: running browser assertions on /dashboard...",
+        logItem: { id: 3, source: "executor", type: "status", content: "Executing test assertion: authenticate valid credentials", ts: new Date().toISOString() },
+      });
+    }, 4500);
+
+    setTimeout(() => {
+      const summary = {
+        total: 5,
+        pass: 3,
+        fail: 1,
+        error: 1,
+        skip: 0,
+        cost: 0.082,
+      };
+      const reports = [
+        {
+          depth: 1,
+          url: "https://demo.verity.qa",
+          page_summary: "Main landing page containing user auth, call-to-actions, and main menu navigation.",
+          results: [
+            {
+              test_name: "Verify landing page title contains 'Verity'",
+              status: "pass" as const,
+              duration_seconds: 3.4,
+              cost_usd: 0.008,
+              evidence: "Title check returned 'Verity | Simplistic QA Runner'",
+              error_detail: "",
+              steps_executed: ["Launch browser and navigate to homepage", "Extract document.title", "Assert title contains 'Verity'"],
+            },
+            {
+              test_name: "Verify responsiveness of main navigation bar",
+              status: "pass" as const,
+              duration_seconds: 4.1,
+              cost_usd: 0.012,
+              evidence: "Elements flex properly; hamburger menu visible at < 768px viewport",
+              error_detail: "",
+              steps_executed: ["Set window size to 375x812", "Locate selector `#nav-hamburger`", "Assert visible"],
+            },
+            {
+              test_name: "Attempt checkout with invalid credit card",
+              status: "fail" as const,
+              duration_seconds: 9.8,
+              cost_usd: 0.024,
+              evidence: "Validation error alert element was not displayed in DOM",
+              error_detail: "AssertionError: Expected error message to be visible",
+              steps_executed: ["Navigate to /checkout", "Fill fake credit card fields", "Click submit button", "Wait 3000ms for error element"],
+            },
+          ],
+        },
+        {
+          depth: 2,
+          url: "https://demo.verity.qa/dashboard",
+          page_summary: "Dynamic authenticated user dashboard and metrics workspace.",
+          results: [
+            {
+              test_name: "Authenticate with valid demo user credentials",
+              status: "pass" as const,
+              duration_seconds: 6.2,
+              cost_usd: 0.015,
+              evidence: "Successfully logged in, user token set in localStorage",
+              error_detail: "",
+              steps_executed: ["Navigate to /login", "Input email 'demo@verity.qa'", "Input password '******'", "Click submit", "Assert URL is /dashboard"],
+            },
+            {
+              test_name: "Load dynamic product detail modal dialog",
+              status: "error" as const,
+              duration_seconds: 8.5,
+              cost_usd: 0.023,
+              evidence: "Element `#product-dialog` missing from dynamic DOM updates",
+              error_detail: "TimeoutError: waiting for selector `#product-dialog` failed: timeout 5000ms exceeded",
+              steps_executed: ["Click on first product grid item", "Wait for dynamic modal selector"],
+            },
+          ],
+        },
+      ];
+      const reportMarkdown = "# Verity QA Test Report - Demo\n\n**Target Website:** https://demo.verity.qa  \n**Status:** Done  \n**Cost:** $0.082 USD  \n\n## Summary of Findings\nDuring this automated QA run, we scanned **2 pages** at depths up to **2**. We executed **5 unique test plan assertions**:\n\n* **Passes:** 3/5  \n* **Failures:** 1/5  \n* **Errors:** 1/5  \n\n### Critical Failures & Errors\n1. **Attempt checkout with invalid credit card (Failed)**\n   * The application allows form submission with invalid cards and fails to display a validation alert.\n2. **Load dynamic product detail modal dialog (Error)**\n   * Clicking on a product grid item throws a timeout error waiting for the modal element, suggesting a JavaScript render regression.\n\n## Recommendations\n- Implement validation on frontend forms for credit card fields prior to API submit.\n- Investigate JavaScript console errors inside `/dashboard` preventing the modal from mounting.";
+      const logItems = [
+        { id: 4, source: "executor" as const, type: "status", content: "Dispatched 5 browser test assertions", ts: new Date().toISOString() },
+        { id: 5, source: "system" as const, type: "status", content: "Compiling summaries and report...", ts: new Date().toISOString() },
+      ];
+      dispatch({
+        kind: "load-mock-done",
+        summary,
+        reports,
+        reportMarkdown,
+        logItems,
+      });
+    }, 7000);
+  }, []);
+
   const actions = useMemo(
     () => ({
       startRun,
@@ -300,6 +436,7 @@ export function useRunStream() {
       captchaSolved,
       clearLogs,
       reset,
+      loadMockData,
     }),
     [
       startRun,
@@ -310,6 +447,7 @@ export function useRunStream() {
       captchaSolved,
       clearLogs,
       reset,
+      loadMockData,
     ],
   );
 

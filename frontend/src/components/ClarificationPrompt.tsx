@@ -48,13 +48,13 @@ export function ClarificationPrompt({ interrupt, onSubmit }: ClarificationPrompt
                 placeholder="Answer for the planner…"
                 onChange={(e) => setAnswer(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !submitting && send()}
-                className="min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 dark:border-amber-500/30 dark:bg-slate-950 dark:text-slate-100"
+                className="min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 dark:border-amber-500/30 dark:bg-bg-dark dark:text-stone-100"
               />
               <button
                 type="button"
                 disabled={submitting}
                 onClick={send}
-                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
+                className="rounded-lg bg-[#3e3a37] px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-850 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200 disabled:opacity-60"
               >
                 {submitting ? "Sending…" : "Send answer"}
               </button>

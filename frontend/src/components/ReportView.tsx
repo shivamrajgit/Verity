@@ -33,12 +33,12 @@ export function ReportView({ markdown, runId }: ReportViewProps) {
   }
 
   const btn =
-    "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800";
+    "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-border-dark dark:bg-bg-dark dark:text-stone-300 dark:hover:bg-stone-850";
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Report</h2>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-border-dark dark:bg-card-dark shadow-sm">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-border-dark">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-stone-200">Report</h2>
         <div className="flex gap-2">
           <button type="button" onClick={copy} className={btn}>
             {copied ? "Copied ✓" : "Copy"}

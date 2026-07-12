@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { StatusBadge } from "./StatusBadge";
 import { STATUS_META } from "../lib/status";
-import { formatCost, formatDuration } from "../lib/format";
+import { formatDuration } from "../lib/format";
 import type { ExecutorResult, PlannerReport, TestStatus } from "../lib/types";
 
 type Filter = "all" | TestStatus;
@@ -21,16 +21,16 @@ function ResultRow({ result }: { result: ExecutorResult }) {
     result.evidence || result.error_detail || (result.steps_executed?.length ?? 0) > 0;
 
   return (
-    <div className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+    <div className="border-b border-stone-100 last:border-0 dark:border-border-dark">
       <button
         type="button"
         onClick={() => hasDetail && setOpen((o) => !o)}
-        className={`flex w-full items-center gap-3 px-4 py-3 text-left ${hasDetail ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40" : "cursor-default"}`}
+        className={`flex w-full items-center gap-3 px-4 py-3 text-left ${hasDetail ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-border-dark/40" : "cursor-default"}`}
       >
         {hasDetail ? (
           <svg
             viewBox="0 0 20 20"
-            className={`h-4 w-4 shrink-0 text-slate-300 transition-transform dark:text-slate-600 ${open ? "rotate-90" : ""}`}
+            className={`h-4 w-4 shrink-0 text-stone-300 transition-transform dark:text-stone-600 ${open ? "rotate-90" : ""}`}
             fill="currentColor"
           >
             <path d="M7 5l6 5-6 5V5z" />
@@ -39,19 +39,16 @@ function ResultRow({ result }: { result: ExecutorResult }) {
           <span className="w-4 shrink-0" />
         )}
 
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-stone-200">
           {result.test_name}
         </span>
 
-        <span className="hidden shrink-0 text-xs tabular-nums text-slate-400 sm:inline">
-          {formatDuration(result.duration_seconds)}
-        </span>
-        {result.cost_usd > 0 && (
-          <span className="hidden shrink-0 text-xs tabular-nums text-slate-400 sm:inline">
-            {formatCost(result.cost_usd)}
+        <div className="shrink-0 flex items-center justify-end gap-1.5 w-28">
+          <StatusBadge status={result.status} />
+          <span className="hidden sm:block shrink-0 text-xs tabular-nums text-stone-400 w-10 text-right">
+            {formatDuration(result.duration_seconds)}
           </span>
-        )}
-        <StatusBadge status={result.status} />
+        </div>
       </button>
 
       <AnimatePresence initial={false}>
@@ -62,7 +59,7 @@ function ResultRow({ result }: { result: ExecutorResult }) {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="space-y-3 bg-slate-50 px-4 py-3 pl-11 text-sm dark:bg-slate-950/40">
+            <div className="space-y-3 bg-slate-50 px-4 py-3 pl-11 text-sm dark:bg-bg-dark/40">
               {result.evidence && (
                 <Detail label="Evidence">{result.evidence}</Detail>
               )}
@@ -73,7 +70,7 @@ function ResultRow({ result }: { result: ExecutorResult }) {
               )}
               {result.steps_executed?.length > 0 && (
                 <Detail label="Steps executed">
-                  <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-slate-600 dark:text-slate-400">
+                  <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-slate-600 dark:text-stone-400">
                     {result.steps_executed.map((step, i) => (
                       <li key={i}>{step}</li>
                     ))}
@@ -92,7 +89,7 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="mt-0.5 whitespace-pre-wrap break-words text-slate-700 dark:text-slate-300">
+      <div className="mt-0.5 whitespace-pre-wrap break-words text-slate-700 dark:text-stone-300">
         {children}
       </div>
     </div>
@@ -104,23 +101,23 @@ function PageCard({ report, filter }: { report: PlannerReport; filter: Filter })
   if (results.length === 0) return null;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white dark:border-border-dark dark:bg-card-dark shadow-sm">
+      <div className="border-b border-stone-100 px-4 py-3 dark:border-border-dark">
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs font-medium text-stone-500 dark:bg-bg-dark dark:text-stone-400">
             depth {report.depth}
           </span>
           <a
             href={report.url}
             target="_blank"
             rel="noreferrer"
-            className="min-w-0 truncate text-sm font-medium text-teal-700 hover:underline dark:text-teal-400"
+            className="min-w-0 truncate text-sm font-semibold text-slate-800 hover:underline dark:text-stone-200"
           >
             {report.url}
           </a>
         </div>
         {report.page_summary && (
-          <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">{report.page_summary}</p>
+          <p className="mt-1.5 text-sm text-slate-500 dark:text-stone-400">{report.page_summary}</p>
         )}
       </div>
       <div>
@@ -151,7 +148,7 @@ export function Results({ reports }: { reports: PlannerReport[] }) {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Results</h2>
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-stone-200">Results</h2>
         <div className="flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (
             <button
@@ -161,9 +158,9 @@ export function Results({ reports }: { reports: PlannerReport[] }) {
               className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
                 filter === f.key
                   ? f.key === "all"
-                    ? "bg-teal-600 text-white"
+                    ? "bg-[#3e3a37] text-white dark:bg-stone-100 dark:text-stone-950"
                     : `${STATUS_META[f.key as TestStatus].badge} ring-1 ring-inset`
-                  : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-card-dark dark:text-stone-400 dark:border dark:border-border-dark dark:hover:bg-border-dark/60"
               }`}
             >
               {f.label} {counts[f.key] ?? 0}

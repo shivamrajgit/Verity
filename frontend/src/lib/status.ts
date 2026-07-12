@@ -32,9 +32,9 @@ export const STATUS_META: Record<TestStatus, StatusMeta> = {
   },
   skip: {
     label: "Skip",
-    dot: "bg-slate-400",
+    dot: "bg-stone-400",
     badge:
-      "bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-500/10 dark:text-slate-400 dark:ring-slate-400/20",
-    accent: "text-slate-500 dark:text-slate-400",
+      "bg-stone-100 text-stone-600 ring-stone-500/20 dark:bg-stone-500/10 dark:text-stone-400 dark:ring-stone-400/20",
+    accent: "text-stone-500 dark:text-stone-400",
   },
 };
