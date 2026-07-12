@@ -16,6 +16,7 @@ def test_config_loads_current_configuration() -> None:
     assert config.llm.fallback.provider == "openrouter"
     assert config.llm.fallback.model == "openrouter/auto"
     assert config.llm.fallback.fallback_models == []
+    assert config.concurrency.step_timeout is None
     assert config.security.allow_private_targets is False
 
 

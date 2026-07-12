@@ -69,7 +69,11 @@ class ConcurrencyConfig(BaseModel):
 
     max_executors: int = Field(default=4, ge=1, le=20)
     stagger_delay_seconds: float = Field(default=2.0, ge=0.0)
-    step_timeout: int = Field(default=180, ge=30)
+    step_timeout: int | None = Field(
+        default=None,
+        ge=30,
+        description="Maximum seconds per executor, or null for no timeout",
+    )
     max_steps: int = Field(default=15, ge=1, le=100)
 
 

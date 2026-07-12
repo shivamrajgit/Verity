@@ -64,6 +64,10 @@ LLM provider requests default to a 4,096-token completion cap through
 its full context limit and helps keep provider credit usage bounded; lower the
 value further in `config.yaml` if needed.
 
+Executors are limited to 10 browser actions by default and have no wall-clock
+timeout (`concurrency.step_timeout: null`). Set it to a positive number of
+seconds when a deployment needs a hard execution budget.
+
 ## Deploy (Docker · Render · Railway)
 
 A single `Dockerfile` produces a self-contained image (Playwright Chromium plus

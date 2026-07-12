@@ -36,8 +36,8 @@ llm:
 concurrency:
   max_executors: 1                  # Keep at 1 to avoid 502s from concurrent cloud model requests
   stagger_delay_seconds: 2.0        # Increased delay between executor launches
-  step_timeout: 180                 # Per-agent step timeout in seconds
-  max_steps: 15                     # Maximum browser-agent actions per test
+  step_timeout: null                 # No wall-clock timeout; stop manually if needed
+  max_steps: 10                      # Bound action loops while covering normal 3-5 step tests
 
 depth:
   max_depth: 0                      # 0 = root only, 1-2 = follow sub-pages discovered by planner

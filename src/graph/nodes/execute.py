@@ -185,9 +185,10 @@ async def _run_executor(
 
             logger.info(f"Starting executor: {test_name}")
             try:
-                result = await asyncio.wait_for(
-                    agent.run(max_steps=config.concurrency.max_steps),
-                    timeout=float(config.concurrency.step_timeout),
+                result = await _run_agent(
+                    agent,
+                    max_steps=config.concurrency.max_steps,
+                    timeout=config.concurrency.step_timeout,
                 )
             except Exception as primary_error:
                 if fallback_llm is None or not is_provider_failover_error(primary_error):
@@ -212,9 +213,10 @@ async def _run_executor(
                     max_failures=5,
                     include_tool_call_examples=True,
                 )
-                result = await asyncio.wait_for(
-                    fallback_agent.run(max_steps=config.concurrency.max_steps),
-                    timeout=float(config.concurrency.step_timeout),
+                result = await _run_agent(
+                    fallback_agent,
+                    max_steps=config.concurrency.max_steps,
+                    timeout=config.concurrency.step_timeout,
                 )
             duration = time.time() - start_time
 
@@ -271,6 +273,14 @@ async def _run_executor(
                     await session.close()
                 except Exception:
                     logger.debug(f"Error closing executor session for '{test_name}'", exc_info=True)
+
+
+async def _run_agent(agent: Any, *, max_steps: int, timeout: int | None) -> Any:
+    """Run an executor, optionally applying the configured wall-clock timeout."""
+    run = agent.run(max_steps=max_steps)
+    if timeout is None:
+        return await run
+    return await asyncio.wait_for(run, timeout=float(timeout))
 
 
 def _parse_executor_result(result: Any, test_name: str, duration: float) -> ExecutorResult:
