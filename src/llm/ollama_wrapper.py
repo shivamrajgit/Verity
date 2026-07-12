@@ -179,9 +179,7 @@ def _fix_done_inner(action: dict[str, Any]) -> dict[str, Any]:
             parts.append(verdict)
 
     if parts:
-        logger.debug(
-            f"Fixing done inner fields: {set(inner.keys())} → text"
-        )
+        logger.debug(f"Fixing done inner fields: {set(inner.keys())} → text")
         action["done"] = {"text": " ".join(parts)}
 
     return action

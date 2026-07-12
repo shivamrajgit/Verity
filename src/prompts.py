@@ -79,6 +79,8 @@ Skip static/informational pages (about, privacy, terms). Only include pages on t
 same domain. Set requires_auth=true if the page needs login.
 - If you are already at a deep sub-page or there are no meaningful links to explore, \
 set sub_pages to an empty array [].
+- Every sub_pages item MUST be an object with url, reason, and requires_auth fields.
+  Never return a bare URL string in sub_pages.
 - Output RAW JSON only — no markdown code fences, no commentary.
 """
 
@@ -116,7 +118,8 @@ def build_planner_prompt(request_dict: dict[str, Any]) -> str:
         if user_instructions:
             prompt += (
                 "\nThis is the ROOT page and the user provided a scoped objective. "
-                "Keep sub_pages as [] unless the user explicitly asks for full-site/deep exploration.\n"
+                "Keep sub_pages as [] unless the user explicitly asks for "
+                "full-site/deep exploration.\n"
             )
         else:
             prompt += (
@@ -152,6 +155,11 @@ IMPORTANT:
 - The 'done' action means the ENTIRE test is complete. It is NOT for typing text.
 - Execute EVERY step listed in the test plan before reporting done.
 - Your 'done' text MUST start with PASS or FAIL followed by a brief explanation.
+- Never invent credentials, payment data, or personal information.
+- Do not purchase, send, delete, publish, or change account settings unless the
+  test plan explicitly supplies safe test data and requires that exact action.
+- If a step would be irreversible or unsafe with the available data, stop and
+  report FAIL with a clear explanation instead of guessing.
 
 Example flow for a login test:
   1. navigate to the URL

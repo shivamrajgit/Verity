@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import hashlib
 import logging
 import sys
+import uuid
 from typing import Any
 
 from dotenv import load_dotenv
@@ -16,9 +16,11 @@ from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.table import Table
 
-from src.config import load_config
+from src.config import AppConfig, LLMProviderConfig, load_config
 from src.graph.builder import build_graph
 from src.models.state import PlannerRequest
+from src.utils.security import UnsafeTargetError, validate_target_url
+from src.utils.url import normalize_url
 
 console = Console()
 
@@ -55,6 +57,13 @@ def parse_args() -> argparse.Namespace:
         "--auto-approve",
         action="store_true",
         help="Auto-approve all sub-page planners (overrides config)",
+    )
+    parser.add_argument(
+        "--gemini",
+        "--Gemini",
+        dest="gemini",
+        action="store_true",
+        help="Use Gemini for all LLM roles instead of the default OpenRouter Auto Router",
     )
     parser.add_argument(
         "--instructions",
@@ -117,12 +126,21 @@ async def run_agent(args: argparse.Namespace) -> int:
     config = load_config(args.config)
 
     # Apply CLI overrides
-    if args.url:
-        config.target_url = args.url
     if args.auto_approve:
         config.approval.mode = "auto_approve"
+    _apply_provider_override(config, use_gemini=args.gemini)
 
-    target_url = config.target_url
+    target_url = args.url or config.target_url
+    try:
+        validate_target_url(
+            target_url,
+            allow_private=config.security.allow_private_targets,
+            allowed_domains=config.security.allowed_target_domains,
+        )
+    except UnsafeTargetError as exc:
+        console.print(f"[red]Unsafe target URL:[/red] {exc}")
+        return 2
+    config.target_url = target_url
 
     # ── Gather user instructions (CLI flag → interactive prompt) ──
     if args.instructions is not None:
@@ -184,7 +202,7 @@ async def run_agent(args: argparse.Namespace) -> int:
     seen: set[str] = set()
     seed_queue: list[dict] = []
     for url in seed_urls:
-        normalized = url.rstrip("/").lower()
+        normalized = normalize_url(url)
         if normalized not in seen:
             seen.add(normalized)
             req = PlannerRequest(
@@ -195,9 +213,7 @@ async def run_agent(args: argparse.Namespace) -> int:
             seed_queue.append(req.to_dict())
 
     if len(seed_queue) > 1:
-        console.print(
-            f"[cyan]Seeded {len(seed_queue)} URLs into planner queue:[/cyan]"
-        )
+        console.print(f"[cyan]Seeded {len(seed_queue)} URLs into planner queue:[/cyan]")
         for i, sq in enumerate(seed_queue, 1):
             console.print(f"  {i}. {sq['url']}")
 
@@ -215,11 +231,13 @@ async def run_agent(args: argparse.Namespace) -> int:
     }
 
     # Thread config for checkpointing
-    thread_id = hashlib.md5(target_url.encode()).hexdigest()
+    thread_id = uuid.uuid4().hex
     graph_config = {"configurable": {"thread_id": thread_id}}
 
     # Run the graph with interrupt handling
     input_data: dict | Command = initial_state
+    result: dict[str, Any] = {}
+    pipeline_failed = False
     while True:
         try:
             result = await graph.ainvoke(input_data, graph_config)
@@ -264,8 +282,7 @@ async def run_agent(args: argparse.Namespace) -> int:
 
                 console.print(
                     Panel(
-                        f"[yellow]{reason}[/yellow]\n"
-                        f"URL: [cyan]{url}[/cyan] | Depth: {depth}",
+                        f"[yellow]{reason}[/yellow]\nURL: [cyan]{url}[/cyan] | Depth: {depth}",
                         title="🔔 Approval Required",
                     )
                 )
@@ -279,9 +296,11 @@ async def run_agent(args: argparse.Namespace) -> int:
 
         except KeyboardInterrupt:
             console.print("\n[yellow]Interrupted by user[/yellow]")
+            pipeline_failed = True
             break
         except Exception:
             logging.exception("Pipeline error")
+            pipeline_failed = True
             break
 
     # Display results
@@ -294,7 +313,27 @@ async def run_agent(args: argparse.Namespace) -> int:
         any(r.get("status") in ("fail", "error") for r in report.get("results", []))
         for report in reports
     )
-    return 1 if has_failures else 0
+    return 1 if pipeline_failed or has_failures or not reports else 0
+
+
+def _apply_provider_override(config: AppConfig, *, use_gemini: bool) -> None:
+    """Apply provider choices requested by the CLI without changing the YAML file."""
+    if not use_gemini:
+        return
+
+    gemini_config = LLMProviderConfig(
+        provider="gemini",
+        model="gemini-2.5-flash",
+        api_key_env="GOOGLE_API_KEY",
+    )
+    config.llm.planner = gemini_config.model_copy(deep=True)
+    config.llm.executor = gemini_config.model_copy(deep=True)
+    config.llm.summarizer = gemini_config.model_copy(deep=True)
+    config.llm.fallback = LLMProviderConfig(
+        provider="openrouter",
+        model="openrouter/auto",
+        api_key_env="OPENROUTER_API_KEY",
+    )
 
 
 def _find_first_interrupt(tasks: Any) -> dict[str, Any] | None:
@@ -378,7 +417,11 @@ def main() -> None:
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    exit_code = asyncio.run(run_agent(args))
+    try:
+        exit_code = asyncio.run(run_agent(args))
+    except Exception:
+        logging.exception("Fatal application error")
+        exit_code = 1
     sys.exit(exit_code)
 
 

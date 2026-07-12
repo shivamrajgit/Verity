@@ -44,15 +44,18 @@ def generate_fallback_plan(url: str, user_instructions: str = "") -> TestPlan:
                 priority="high",
             ),
             TestCase(
-                name="No JavaScript console errors",
-                description="Check the browser console for JavaScript errors",
+                name="Page renders without visible errors",
+                description=(
+                    "Verify the page renders its primary content without visible error states"
+                ),
                 url=url,
                 steps=[
                     f"Navigate to {url}",
                     "Wait for page to fully load",
-                    "Check browser console for error-level messages",
+                    "Check that the main content is visible",
+                    "Check for visible error messages or broken layout",
                 ],
-                expected_outcome="No JavaScript errors in the browser console",
+                expected_outcome="The main content is visible and no obvious error state is shown",
                 priority="medium",
             ),
         ],
@@ -75,52 +78,22 @@ def _build_focused_test_cases(url: str, instructions: str) -> list[TestCase]:
     """
     lower = instructions.lower().strip()
 
-    # Login / auth pattern
+    # Login / auth pattern. Never invent credentials: the fallback planner has
+    # no trusted test-data source and must not submit guesses to a real site.
     if any(kw in lower for kw in ("login", "sign in", "signin", "sign-in", "auth")):
         return [
             TestCase(
-                name="Valid login with correct credentials",
-                description="Enter valid username and password, submit the form, verify redirect",
+                name="Login form renders without unsafe submission",
+                description="Verify that the login form is visible without guessing credentials",
                 url=url,
                 steps=[
                     f"Navigate to {url}",
-                    "Click on the username input field",
-                    "Type 'standard_user' into the username field",
-                    "Click on the password input field",
-                    "Type 'secret_sauce' into the password field",
-                    "Click the login/submit button",
-                    "Verify the page navigates away from the login page",
+                    "Wait for the page to fully load",
+                    "Locate the username and password fields if present",
+                    "Do not enter credentials or submit the form",
                 ],
-                expected_outcome="User is logged in and redirected to the main/inventory page",
-                priority="critical",
-            ),
-            TestCase(
-                name="Login fails with invalid credentials",
-                description="Enter wrong credentials to verify error handling",
-                url=url,
-                steps=[
-                    f"Navigate to {url}",
-                    "Click on the username input field",
-                    "Type 'invalid_user' into the username field",
-                    "Click on the password input field",
-                    "Type 'wrong_password' into the password field",
-                    "Click the login/submit button",
-                    "Look for an error message on the page",
-                ],
-                expected_outcome="An error message is displayed indicating invalid credentials",
+                expected_outcome="The login form renders and no guessed credentials are submitted",
                 priority="high",
-            ),
-            TestCase(
-                name="Login fails with empty fields",
-                description="Submit login form without entering credentials",
-                url=url,
-                steps=[
-                    f"Navigate to {url}",
-                    "Click the login/submit button without entering any credentials",
-                    "Look for a validation or error message",
-                ],
-                expected_outcome="An error message is displayed about required fields",
-                priority="medium",
             ),
         ]
 

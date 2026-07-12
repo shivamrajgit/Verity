@@ -9,6 +9,7 @@ from typing import Any
 
 from src.config import AppConfig
 from src.llm.factory import create_llm
+from src.llm.retry import is_provider_failover_error
 from src.models.executor_result import ExecutorResult
 from src.models.test_plan import TestPlan
 from src.prompts import EXECUTOR_SYSTEM_PROMPT, build_executor_prompt
@@ -42,9 +43,7 @@ async def execute_node(state: dict[str, Any], app_config: AppConfig) -> dict[str
         logger.info("Test plan has no test cases — skipping execution")
         return {"current_results": []}
 
-    logger.info(
-        f"Executing {len(test_plan.test_cases)} test cases"
-    )
+    logger.info(f"Executing {len(test_plan.test_cases)} test cases")
 
     # Log executor assignments for visibility
     _log_executor_assignments(test_plan, app_config)
@@ -92,7 +91,16 @@ async def execute_node(state: dict[str, Any], app_config: AppConfig) -> dict[str
         else:
             results.append(raw)
 
-    update: dict[str, Any] = {"current_results": results}
+    observed_cost = sum(float(result.get("cost_usd", 0.0) or 0.0) for result in results)
+    total_cost = float(state.get("total_cost", 0.0) or 0.0) + observed_cost
+    if app_config.cost.max_total_cost is not None and total_cost > app_config.cost.max_total_cost:
+        logger.error(
+            "Configured cost budget exceeded: %.4f > %.4f",
+            total_cost,
+            app_config.cost.max_total_cost,
+        )
+
+    update: dict[str, Any] = {"current_results": results, "total_cost": total_cost}
 
     # Store exported storage state for auth propagation to child planners
     if exported_storage_state and current_request:
@@ -176,14 +184,45 @@ async def _run_executor(
             )
 
             logger.info(f"Starting executor: {test_name}")
-            result = await asyncio.wait_for(
-                agent.run(max_steps=15),
-                timeout=float(config.concurrency.step_timeout),
-            )
+            try:
+                result = await asyncio.wait_for(
+                    agent.run(max_steps=config.concurrency.max_steps),
+                    timeout=float(config.concurrency.step_timeout),
+                )
+            except Exception as primary_error:
+                if fallback_llm is None or not is_provider_failover_error(primary_error):
+                    raise
+                logger.warning(
+                    "Primary executor provider failed for '%s'; switching to %s: %s",
+                    test_name,
+                    config.llm.fallback.provider if config.llm.fallback else "fallback",
+                    primary_error,
+                )
+                fallback_agent = Agent(
+                    task=task_prompt,
+                    llm=fallback_llm,
+                    browser_session=session,
+                    extend_system_message=EXECUTOR_SYSTEM_PROMPT,
+                    fallback_llm=None,
+                    use_vision=True,
+                    flash_mode=True,
+                    use_thinking=False,
+                    use_judge=False,
+                    max_actions_per_step=1,
+                    max_failures=5,
+                    include_tool_call_examples=True,
+                )
+                result = await asyncio.wait_for(
+                    fallback_agent.run(max_steps=config.concurrency.max_steps),
+                    timeout=float(config.concurrency.step_timeout),
+                )
             duration = time.time() - start_time
 
             # Try to parse structured output
             executor_result = _parse_executor_result(result, test_name, duration)
+            usage = getattr(result, "usage", None)
+            if config.cost.calculate_cost and usage is not None:
+                executor_result.cost_usd = float(getattr(usage, "total_cost", 0.0) or 0.0)
 
             # Export storage state if this was an auth-related test
             if _is_auth_test(test_case) and session:
@@ -196,19 +235,17 @@ async def _run_executor(
 
             return (executor_result.model_dump(), exported_state)
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             duration = time.time() - start_time
             logger.error(
-                f"Executor timed out for '{test_name}' after "
-                f"{config.concurrency.step_timeout}s"
+                f"Executor timed out for '{test_name}' after {config.concurrency.step_timeout}s"
             )
             result = ExecutorResult(
                 test_name=test_name,
                 status="error",
                 evidence="",
                 error_detail=(
-                    "Executor exceeded configured timeout "
-                    f"({config.concurrency.step_timeout}s)"
+                    f"Executor exceeded configured timeout ({config.concurrency.step_timeout}s)"
                 ),
                 steps_executed=[],
                 duration_seconds=duration,
@@ -270,23 +307,35 @@ def _parse_executor_result(result: Any, test_name: str, duration: float) -> Exec
                 evidence = str(entry.extracted_content)[:1000]
                 break
 
-    # Determine status from agent judgment and judge verdict
-    status: str = "pass"
+    # Determine status from agent judgment and judge verdict. Unknown results
+    # are errors, never passes: missing evidence must not create false positives.
+    final_text = ""
+    if hasattr(result, "final_result"):
+        final_result = result.final_result
+        final_text = str(final_result() if callable(final_result) else final_result or "")[:1000]
+        evidence = evidence or final_text
+
+    status: str = "error"
     if hasattr(result, "is_done") and callable(result.is_done):
         if result.is_done():
             # Agent finished — check if it reported success
-            if hasattr(result, "is_successful") and callable(result.is_successful):
-                status = "pass" if result.is_successful() else "fail"
+            success_fn = getattr(result, "is_successful", None)
+            success = success_fn() if callable(success_fn) else None
+            if success is True or final_text.upper().startswith("PASS"):
+                status = "pass"
+            elif success is False or final_text.upper().startswith("FAIL"):
+                status = "fail"
+            else:
+                evidence = evidence or "Agent completed without a valid PASS/FAIL verdict"
         else:
             # Agent hit max_steps without completing
             status = "fail"
             if not evidence:
                 evidence = "Agent exhausted step budget without completing the test"
-    elif hasattr(result, "final_result") and result.final_result:
-        # browser-use may expose final_result with success flag
-        fr = result.final_result
-        if hasattr(fr, "success") and fr.success is False:
-            status = "fail"
+    elif final_text.upper().startswith("PASS"):
+        status = "pass"
+    elif final_text.upper().startswith("FAIL"):
+        status = "fail"
 
     # Override with judge verdict if available — the judge is more reliable
     # than the agent's self-assessment
@@ -307,7 +356,8 @@ def _parse_executor_result(result: Any, test_name: str, duration: float) -> Exec
     return ExecutorResult(
         test_name=test_name,
         status=status,
-        evidence=evidence or "Test completed but no structured output was returned",
+        evidence=evidence or "Executor returned no usable evidence or verdict",
+        error_detail=("Executor returned no usable verdict" if status == "error" else None),
         steps_executed=[],
         duration_seconds=duration,
     )
@@ -329,7 +379,7 @@ def _log_executor_assignments(plan: TestPlan, config: AppConfig) -> None:
     for i, tc in enumerate(plan.test_cases, 1):
         steps_text = "\n".join(f"  {j}. {s}" for j, s in enumerate(tc.steps, 1))
         prompt_preview = (
-            f"[bold]{tc.name}[/bold] → {executor_model}\n"
+            f"[bold]{tc.name}[/bold] -> {executor_model}\n"
             f"URL: {tc.url}\n"
             f"Steps:\n{steps_text}\n"
             f"Expected: {tc.expected_outcome}"
@@ -337,7 +387,7 @@ def _log_executor_assignments(plan: TestPlan, config: AppConfig) -> None:
         console.print(
             Panel(
                 prompt_preview,
-                title=f"🤖 Executor {i}/{len(plan.test_cases)}",
+                title=f"Executor {i}/{len(plan.test_cases)}",
                 border_style="green",
             )
         )

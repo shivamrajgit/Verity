@@ -53,6 +53,18 @@ Force auto-approve mode:
 make run-auto
 ```
 
+The default provider is OpenRouter's Auto Router. To use Gemini for the
+planner, executor, and summarizer for one run, pass:
+
+```bash
+uv run python -m src.main --config config.yaml --gemini
+```
+
+(`--Gemini` is accepted as an alias.) Gemini runs keep OpenRouter Auto Router
+as their fallback provider.
+
+With Make, use `make run ARGS=--gemini`.
+
 A final report is written to the configured report path (default: `report.md`).
 
 ## Provider Config Format
@@ -60,10 +72,10 @@ A final report is written to the configured report path (default: `report.md`).
 Each LLM entry in `config.yaml` uses this shape:
 
 ```yaml
-provider: gemini
-model: gemini-2.0-flash
+provider: openrouter
+model: openrouter/auto
 base_url: null
-api_key_env: null
+api_key_env: OPENROUTER_API_KEY
 ```
 
 `provider` and `model` are required. `base_url` and `api_key_env` are optional.
@@ -89,6 +101,11 @@ Then open:
 ```text
 http://localhost:8000
 ```
+
+For a deployed server, keep the application bound to localhost behind an
+authenticated reverse proxy, or set `CRAGENT_API_TOKEN` and
+`CRAGENT_REQUIRE_API_TOKEN=true`. Target URLs are checked against private-IP
+and domain policies before a browser is launched.
 
 From the UI you can:
 - Enter target URL and optional instructions

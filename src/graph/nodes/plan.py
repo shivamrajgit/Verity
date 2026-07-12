@@ -19,7 +19,7 @@ from typing import Any
 from langgraph.types import interrupt
 
 from src.config import AppConfig
-from src.models.test_plan import TestPlan
+from src.models.test_plan import TestPlan, repair_test_plan_payload
 from src.prompts import PLANNER_SYSTEM_PROMPT, build_planner_prompt
 from src.utils.fallback import generate_fallback_plan
 
@@ -62,11 +62,13 @@ async def plan_node(state: dict[str, Any], app_config: AppConfig) -> dict[str, A
 
     # If Gemini asked for clarification and we haven't hit the limit, interrupt
     if test_plan is None and clarification and clarification_count < max_clarifications:
-        user_answer = interrupt({
-            "type": "planner_clarification",
-            "url": url,
-            "question": clarification,
-        })
+        user_answer = interrupt(
+            {
+                "type": "planner_clarification",
+                "url": url,
+                "question": clarification,
+            }
+        )
         # Save context to state -- will be available on next invocation
         new_context = extra_context + f"\nQ: {clarification}\nA: {user_answer}"
         return {
@@ -77,22 +79,22 @@ async def plan_node(state: dict[str, Any], app_config: AppConfig) -> dict[str, A
     # Attempt 2: Fallback LLM (text-only, non-Gemini)
     if test_plan is None and app_config.llm.fallback:
         logger.warning(f"Primary planner failed for {url}, trying fallback LLM")
-        test_plan = await _call_legacy_planner(task_prompt, app_config, use_fallback=True)
+        test_plan = await _call_legacy_planner(
+            task_prompt,
+            app_config,
+            use_fallback=True,
+            default_url=url,
+        )
 
     # Attempt 3: Generic fallback plan
     if test_plan is None:
         logger.warning(f"All planners failed for {url}, using generic fallback plan")
-        test_plan = generate_fallback_plan(
-            url, current_request.get("user_instructions", "")
-        )
+        test_plan = generate_fallback_plan(url, current_request.get("user_instructions", ""))
 
     logger.info(
         f"Plan for {url}: {len(test_plan.test_cases)} test cases, "
         f"{len(test_plan.sub_pages)} sub-pages"
     )
-
-    if test_plan.sub_pages:
-        sp_urls = [sp.url for sp in test_plan.sub_pages]
 
     # Log the full plan details for visibility
     _log_test_plan(test_plan, url)
@@ -120,9 +122,7 @@ def _log_test_plan(plan: TestPlan, url: str) -> None:
 
     # Summary
     if plan.page_summary:
-        console.print(
-            Panel(plan.page_summary, title=f"📋 Plan: {url}", border_style="cyan")
-        )
+        console.print(Panel(plan.page_summary, title=f"Plan: {url}", border_style="cyan"))
 
     # Test cases table
     table = Table(
@@ -176,7 +176,12 @@ async def _call_primary_planner(
 
     if provider == "gemini":
         return await _call_gemini_planner(url, task_prompt, config)
-    plan = await _call_legacy_planner(task_prompt, config, use_fallback=False)
+    plan = await _call_legacy_planner(
+        task_prompt,
+        config,
+        use_fallback=False,
+        default_url=url,
+    )
     return (plan, None)
 
 
@@ -203,9 +208,7 @@ async def _call_gemini_planner(
     # Step 1: Capture screenshot
     screenshot_bytes: bytes | None = None
     try:
-        screenshot_bytes = await capture_screenshot(
-            url, headless=config.browser.headless
-        )
+        screenshot_bytes = await capture_screenshot(url, headless=config.browser.headless)
     except Exception:
         logger.warning(f"Screenshot capture failed for {url}", exc_info=True)
 
@@ -225,7 +228,7 @@ async def _call_gemini_planner(
         if clarification:
             return (None, clarification)
 
-        plan = _extract_test_plan(raw_text)
+        plan = _extract_test_plan(raw_text, default_url=url)
         if plan is None:
             logger.error(
                 "Gemini returned text but it could not be parsed into a TestPlan. "
@@ -264,6 +267,7 @@ async def _call_legacy_planner(
     task_prompt: str,
     config: AppConfig,
     use_fallback: bool,
+    default_url: str | None = None,
 ) -> TestPlan | None:
     """Make a text-only LLM call to produce a TestPlan (non-Gemini path).
 
@@ -292,24 +296,35 @@ async def _call_legacy_planner(
             UserMessage(content=task_prompt),
         ]
 
+        if llm_config.get("provider", "").lower() == "openrouter":
+            try:
+                response = await llm.ainvoke(messages, output_format=TestPlan)
+                structured = getattr(response, "completion", response)
+                if isinstance(structured, TestPlan):
+                    return structured if structured.test_cases else None
+                if isinstance(structured, dict):
+                    repaired = repair_test_plan_payload(structured, default_url)
+                    if repaired and repaired["test_cases"]:
+                        return TestPlan.model_validate(repaired)
+                    return None
+            except Exception:
+                logger.warning(
+                    "Structured planner response failed; retrying with repair-capable text output",
+                    exc_info=True,
+                )
+
         response = await llm.ainvoke(messages)
-        raw_text = (
-            response.completion
-            if hasattr(response, "completion")
-            else response.content
-            if hasattr(response, "content")
-            else str(response)
-        )
+        raw_text = _response_text(response)
 
         logger.debug(f"Planner LLM raw response length: {len(raw_text)}")
-        return _extract_test_plan(raw_text)
+        return _extract_test_plan(raw_text, default_url=default_url)
 
     except Exception:
         logger.exception("Legacy planner LLM call failed")
         return None
 
 
-def _extract_test_plan(text: str) -> TestPlan | None:
+def _extract_test_plan(text: str, default_url: str | None = None) -> TestPlan | None:
     """Extract a TestPlan JSON from LLM text output.
 
     Tries multiple strategies: direct parse, code-block extraction, brace matching.
@@ -326,7 +341,7 @@ def _extract_test_plan(text: str) -> TestPlan | None:
     # Strategy 1: The entire response might be valid JSON
     try:
         data = json.loads(text.strip())
-        return TestPlan.model_validate(data)
+        return _validate_repaired_plan(data, default_url)
     except (json.JSONDecodeError, Exception):
         pass
 
@@ -340,7 +355,7 @@ def _extract_test_plan(text: str) -> TestPlan | None:
         for match in matches:
             try:
                 data = json.loads(match)
-                return TestPlan.model_validate(data)
+                return _validate_repaired_plan(data, default_url)
             except (json.JSONDecodeError, Exception):
                 continue
 
@@ -358,9 +373,29 @@ def _extract_test_plan(text: str) -> TestPlan | None:
                         candidate = text[brace_start : i + 1]
                         try:
                             data = json.loads(candidate)
-                            return TestPlan.model_validate(data)
+                            return _validate_repaired_plan(data, default_url)
                         except (json.JSONDecodeError, Exception):
                             pass
                         break
 
     return None
+
+
+def _validate_repaired_plan(data: Any, default_url: str | None = None) -> TestPlan | None:
+    """Repair a decoded planner payload, then enforce the application schema."""
+    repaired = repair_test_plan_payload(data, default_url=default_url)
+    if repaired is None or not repaired["test_cases"]:
+        return None
+    try:
+        return TestPlan.model_validate(repaired)
+    except Exception:
+        logger.debug("Repaired planner payload still failed validation", exc_info=True)
+        return None
+
+
+def _response_text(response: Any) -> str:
+    """Extract text from browser-use and OpenAI-compatible response objects."""
+    content = getattr(response, "completion", None)
+    if content is None:
+        content = getattr(response, "content", None)
+    return content if isinstance(content, str) else str(content or response)

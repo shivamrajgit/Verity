@@ -161,7 +161,7 @@ def _log_queue_status(
         console.print(
             Panel(
                 pending,
-                title=f"📋 Planner Queue ({len(full_queue)} pending)",
+                title=f"Planner Queue ({len(full_queue)} pending)",
                 border_style="yellow",
             )
         )

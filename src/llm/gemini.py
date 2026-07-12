@@ -10,6 +10,8 @@ import logging
 import os
 from typing import Any
 
+from src.llm.retry import retry_async
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,7 @@ async def capture_screenshot(url: str, headless: bool = True) -> bytes:
     """
     from playwright.async_api import async_playwright
 
+    browser = None
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=headless)
@@ -36,11 +39,15 @@ async def capture_screenshot(url: str, headless: bool = True) -> bytes:
             # Give JS-heavy pages a moment to render
             await page.wait_for_timeout(2000)
             screenshot = await page.screenshot(full_page=True, type="png")
-            await browser.close()
-
             return screenshot
     except Exception as e:
         raise RuntimeError(f"Failed to capture screenshot of {url}: {e}") from e
+    finally:
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception:
+                logger.debug("Failed to close planner screenshot browser", exc_info=True)
 
 
 async def call_gemini_planner(
@@ -87,9 +94,7 @@ async def call_gemini_planner(
 
     # Screenshot (multimodal)
     if screenshot_bytes:
-        parts.append(
-            types.Part.from_bytes(data=screenshot_bytes, mime_type="image/png")
-        )
+        parts.append(types.Part.from_bytes(data=screenshot_bytes, mime_type="image/png"))
         parts.append(
             types.Part.from_text(
                 text=(
@@ -113,14 +118,17 @@ async def call_gemini_planner(
     parts.append(types.Part.from_text(text=user_prompt))
 
     try:
-        response = await client.aio.models.generate_content(
-            model=model_name,
-            contents=[types.Content(role="user", parts=parts)],
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-                max_output_tokens=4096,
-                response_mime_type="application/json",
+        response = await retry_async(
+            lambda: client.aio.models.generate_content(
+                model=model_name,
+                contents=[types.Content(role="user", parts=parts)],
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    max_output_tokens=4096,
+                    response_mime_type="application/json",
+                ),
             ),
+            operation_name="Gemini planner",
         )
 
         text = response.text or ""

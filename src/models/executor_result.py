@@ -24,3 +24,6 @@ class ExecutorResult(BaseModel):
     duration_seconds: float = Field(
         default=0.0, description="Wall-clock time for this test execution"
     )
+    cost_usd: float = Field(
+        default=0.0, ge=0.0, description="Provider-reported execution cost when available"
+    )

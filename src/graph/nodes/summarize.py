@@ -7,6 +7,7 @@ summarizer is a plain text-in / text-out LLM invocation.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,8 @@ async def summarize_node(state: dict[str, Any], app_config: AppConfig) -> dict[s
         logger.warning("No reports to summarize — generating empty report")
         final_report = _generate_empty_report(app_config.target_url)
     else:
-        final_report = await _generate_report_via_llm(reports, app_config)
+        narrative = await _generate_report_via_llm(reports, app_config)
+        final_report = _compose_report(reports, narrative)
 
     # Write report to file
     output_path = Path(app_config.report.output_path)
@@ -55,22 +57,117 @@ async def _generate_report_via_llm(reports: list[dict[str, Any]], config: AppCon
     Returns:
         Markdown report string.
     """
-    try:
-        provider_config = config.llm.summarizer.to_dict()
-        prompt = build_summarizer_prompt(reports)
+    prompt = build_summarizer_prompt(reports)
+    primary_config = config.llm.summarizer.to_dict()
 
+    try:
         raw_text = await call_llm_chat(
             system_prompt=SUMMARIZER_SYSTEM_PROMPT,
             user_prompt=prompt,
-            provider_config=provider_config,
+            provider_config=primary_config,
         )
         if not raw_text or not raw_text.strip():
             raise ValueError("Summarizer LLM returned empty response")
         return raw_text
-
     except Exception:
-        logger.exception("Summarizer LLM failed — generating fallback report")
-        return _generate_fallback_report(reports)
+        logger.warning(
+            "Primary summarizer failed; trying fallback provider",
+            exc_info=True,
+        )
+
+    fallback_config = config.llm.fallback
+    if fallback_config and fallback_config.provider != config.llm.summarizer.provider:
+        try:
+            raw_text = await call_llm_chat(
+                system_prompt=SUMMARIZER_SYSTEM_PROMPT,
+                user_prompt=prompt,
+                provider_config=fallback_config.to_dict(),
+            )
+            if not raw_text or not raw_text.strip():
+                raise ValueError("Fallback summarizer LLM returned empty response")
+            return raw_text
+        except Exception:
+            logger.exception("Fallback summarizer LLM failed")
+
+    logger.warning("No working summarizer provider; generating deterministic report")
+    return ""
+
+
+def _compose_report(reports: list[dict[str, Any]], narrative: str) -> str:
+    """Build deterministic status/counts and append optional LLM narrative."""
+    total = sum(len(report.get("results", [])) for report in reports)
+    passed = sum(
+        1
+        for report in reports
+        for result in report.get("results", [])
+        if result.get("status") == "pass"
+    )
+    failed = sum(
+        1
+        for report in reports
+        for result in report.get("results", [])
+        if result.get("status") == "fail"
+    )
+    errors = sum(
+        1
+        for report in reports
+        for result in report.get("results", [])
+        if result.get("status") == "error"
+    )
+    skipped = sum(
+        1
+        for report in reports
+        for result in report.get("results", [])
+        if result.get("status") == "skip"
+    )
+    total_cost = sum(
+        float(result.get("cost_usd", 0.0) or 0.0)
+        for report in reports
+        for result in report.get("results", [])
+    )
+
+    if total == 0:
+        status = "NO TESTS"
+    elif errors:
+        status = "ERROR"
+    elif failed:
+        status = "FAIL"
+    else:
+        status = "PASS"
+
+    lines = [
+        "# Website Test Report",
+        "",
+        f"**Generated:** {datetime.now(UTC).isoformat()}",
+        f"**Status:** {status}",
+        "",
+        "## Deterministic Summary",
+        "",
+        f"- **Total:** {total}",
+        f"- **Passed:** {passed}",
+        f"- **Failed:** {failed}",
+        f"- **Errors:** {errors}",
+        f"- **Skipped:** {skipped}",
+        f"- **Observed provider cost:** ${total_cost:.4f}",
+        "",
+        "## Results",
+        "",
+        "| Page | Test | Status | Evidence |",
+        "|---|---|---|---|",
+    ]
+    for report in reports:
+        for result in report.get("results", []):
+            evidence = str(result.get("evidence", ""))
+            evidence = evidence.replace("|", "\\|").replace("\n", " ")[:500]
+            name = str(result.get("test_name", "Unknown")).replace("|", "\\|")
+            lines.append(
+                f"| {report.get('url', 'unknown')} | {name} | "
+                f"{result.get('status', 'unknown')} | {evidence} |"
+            )
+
+    if narrative.strip():
+        lines.extend(["", "## LLM Narrative", "", narrative.strip()])
+    return "\n".join(lines) + "\n"
 
 
 def _generate_empty_report(target_url: str) -> str:

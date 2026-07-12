@@ -24,10 +24,10 @@ test-slow:
 
 # ── Run ──
 run:
-	uv run python -m src.main --config config.yaml
+	uv run python -m src.main --config config.yaml $(ARGS)
 
 run-auto:
-	uv run python -m src.main --config config.yaml --auto-approve
+	uv run python -m src.main --config config.yaml --auto-approve $(ARGS)
 
 # ── Clean ──
 clean:

@@ -2,12 +2,12 @@
 name = "web-test-agent"
 version = "0.1.0"
 description = "Autonomous website testing agent using browser-use and LangGraph"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.14"
 readme = "README.md"
 license = { text = "MIT" }
 
 dependencies = [
-    "browser-use>=0.12.1",
+    "browser-use>=0.13.4",
     "langgraph>=1.0.10",
     "langgraph-checkpoint>=2.1.0",
     "pyyaml>=6.0",

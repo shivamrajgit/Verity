@@ -56,14 +56,10 @@ def is_same_domain(url: str, base_url: str) -> bool:
     Returns:
         True if both URLs share the same domain.
     """
-    url_host = urlparse(url).netloc.lower()
-    base_host = urlparse(base_url).netloc.lower()
+    url_domain = (urlparse(url).hostname or "").rstrip(".").lower()
+    base_domain = (urlparse(base_url).hostname or "").rstrip(".").lower()
 
-    # Strip port for comparison
-    url_domain = url_host.split(":")[0]
-    base_domain = base_host.split(":")[0]
-
-    return url_domain == base_domain
+    return bool(url_domain) and url_domain == base_domain
 
 
 def resolve_url(url: str, base_url: str) -> str:

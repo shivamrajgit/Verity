@@ -1,4 +1,4 @@
-"""Direct LLM chat — plain Ollama / Gemini calls without browser-use wrappers.
+"""Direct LLM chat — plain provider calls without browser-use wrappers.
 
 Provides a single ``call_llm_chat`` entry-point that routes to the correct
 provider backend.  Used by the summarizer (and any future node that needs
@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any
+
+from src.llm.retry import retry_async
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +35,16 @@ async def call_llm_chat(
         ValueError: If the provider is not supported.
         RuntimeError: If the API call fails.
     """
-    provider = provider_config.get("provider", "")
+    provider = str(provider_config.get("provider", "")).lower()
     if provider == "gemini":
         return await _call_gemini(system_prompt, user_prompt, provider_config)
     if provider == "ollama":
         return await _call_ollama(system_prompt, user_prompt, provider_config)
+    if provider == "openrouter":
+        return await _call_openrouter(system_prompt, user_prompt, provider_config)
     raise ValueError(
         f"Unsupported direct-chat provider '{provider}'. "
-        "Supported: 'ollama', 'gemini'."
+        "Supported: 'ollama', 'gemini', 'openrouter'."
     )
 
 
@@ -68,9 +72,7 @@ async def _call_ollama(
     import httpx
 
     model = config.get("model", "llama3.1:8b")
-    base_url = config.get("base_url") or os.environ.get(
-        "OLLAMA_HOST", "http://localhost:11434"
-    )
+    base_url = config.get("base_url") or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
     url = f"{base_url.rstrip('/')}/api/chat"
 
     payload = {
@@ -86,8 +88,6 @@ async def _call_ollama(
         },
     }
 
-
-
     try:
         async with httpx.AsyncClient(timeout=180.0) as client:
             resp = await client.post(url, json=payload)
@@ -95,8 +95,7 @@ async def _call_ollama(
             data = resp.json()
     except httpx.HTTPStatusError as exc:
         raise RuntimeError(
-            f"Ollama returned HTTP {exc.response.status_code}: "
-            f"{exc.response.text[:300]}"
+            f"Ollama returned HTTP {exc.response.status_code}: {exc.response.text[:300]}"
         ) from exc
     except Exception as exc:
         raise RuntimeError(f"Ollama chat request failed: {exc}") from exc
@@ -144,24 +143,25 @@ async def _call_gemini(
     model_name = config.get("model", "gemini-2.5-flash")
     client = genai.Client(api_key=api_key)
 
-
-
     try:
-        response = await client.aio.models.generate_content(
-            model=model_name,
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(text=system_prompt),
-                        types.Part.from_text(text=user_prompt),
-                    ],
-                )
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.3,
-                max_output_tokens=8192,
+        response = await retry_async(
+            lambda: client.aio.models.generate_content(
+                model=model_name,
+                contents=[
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part.from_text(text=system_prompt),
+                            types.Part.from_text(text=user_prompt),
+                        ],
+                    )
+                ],
+                config=types.GenerateContentConfig(
+                    temperature=0.3,
+                    max_output_tokens=8192,
+                ),
             ),
+            operation_name="Gemini summarizer",
         )
 
         text = response.text or ""
@@ -173,3 +173,43 @@ async def _call_gemini(
 
     except Exception as exc:
         raise RuntimeError(f"Gemini summarizer call failed: {exc}") from exc
+
+
+async def _call_openrouter(
+    system_prompt: str,
+    user_prompt: str,
+    config: dict[str, Any],
+) -> str:
+    """Call OpenRouter through Browser Use's OpenAI-compatible wrapper."""
+    from browser_use.llm import ChatOpenRouter, SystemMessage, UserMessage
+
+    api_key_env = config.get("api_key_env", "OPENROUTER_API_KEY")
+    api_key = os.environ.get(api_key_env, "") or os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        raise RuntimeError(
+            f"OpenRouter API key not found. Set '{api_key_env}' or "
+            "'OPENROUTER_API_KEY' environment variable."
+        )
+
+    llm = ChatOpenRouter(
+        model=config.get("model", "openrouter/auto"),
+        api_key=api_key,
+        extra_body=(
+            {"models": config["fallback_models"]} if config.get("fallback_models") else None
+        ),
+        max_retries=3,
+    )
+    response = await retry_async(
+        lambda: llm.ainvoke(
+            [
+                SystemMessage(content=system_prompt),
+                UserMessage(content=user_prompt),
+            ]
+        ),
+        operation_name="OpenRouter chat",
+    )
+    text = getattr(response, "completion", None) or getattr(response, "content", None)
+    text = text or str(response)
+    if not str(text).strip():
+        raise RuntimeError("OpenRouter returned an empty response")
+    return str(text)

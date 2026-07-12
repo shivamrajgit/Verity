@@ -35,9 +35,15 @@ def create_llm(provider_config: dict[str, Any]) -> Any:
         from browser_use.llm import ChatOpenRouter
 
         api_key = _resolve_api_key(api_key_env, "OPENROUTER_API_KEY")
+        extra_body = {}
+        fallback_models = provider_config.get("fallback_models") or []
+        if fallback_models:
+            extra_body["models"] = fallback_models
         return ChatOpenRouter(
             model=model,
             api_key=api_key,
+            extra_body=extra_body or None,
+            max_retries=3,
             **({"base_url": base_url} if base_url else {}),
         )
 
@@ -74,13 +80,14 @@ def create_llm(provider_config: dict[str, Any]) -> Any:
         return ChatOpenAI(model=model, api_key=api_key)
 
     elif provider == "gemini":
-        # Gemini is used directly via google-genai SDK in the planner node,
-        # not through the browser-use wrapper. This branch exists only for
-        # completeness if create_llm() is called with gemini config.
-        raise ValueError(
-            "Gemini provider should be used via the planner node directly, "
-            "not through create_llm(). Set provider='gemini' in the planner "
-            "config section."
+        from browser_use.llm import ChatGoogle
+
+        api_key = _resolve_api_key(api_key_env, "GOOGLE_API_KEY")
+        return ChatGoogle(
+            model=model,
+            api_key=api_key,
+            temperature=0.0,
+            max_retries=5,
         )
 
     else:
