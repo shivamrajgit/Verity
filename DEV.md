@@ -59,14 +59,22 @@ The server rejects private or loopback targets by default. Configure
 `security.allow_private_targets` only for trusted local development, and use
 `security.allowed_target_domains` to restrict target scope.
 
+LLM provider requests default to a 4,096-token completion cap through
+`llm.*.max_output_tokens`. This prevents OpenRouter Auto Router from requesting
+its full context limit and helps keep provider credit usage bounded; lower the
+value further in `config.yaml` if needed.
+
 ## Deploy (Docker · Render · Railway)
 
 A single `Dockerfile` produces a self-contained image (Playwright Chromium plus
 the committed `static/` build) that runs on either Render or Railway:
 
 1. Ensure `static/` holds a fresh `make frontend-build`, then push the repo to GitHub.
-2. Create a new **Web Service** from the repo — both platforms auto-detect the `Dockerfile`.
-3. Set environment variables:
+2. For Render, choose **New → Blueprint**, select the repo, and keep the root
+   `render.yaml`. It configures the Docker runtime, `/api/health` check, rate
+   limits, and a generated API token. Enter your `OPENROUTER_API_KEY` when Render
+   prompts for it. Alternatively, create a Web Service and select **Docker**.
+3. For Railway or a manual Render Web Service, set environment variables:
    - `OPENROUTER_API_KEY` — your provider key (the server pays for runs).
    - Either `VERITY_API_TOKEN` (require a token) **or** `VERITY_ALLOW_UNAUTHENTICATED=true` for an open, rate-limited personal deploy.
    - Optionally tune `VERITY_RATE_LIMIT_RUNS` / `VERITY_RATE_LIMIT_WINDOW_SECONDS` and `VERITY_MAX_ACTIVE_RUNS`.

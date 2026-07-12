@@ -13,21 +13,25 @@ llm:
     provider: "openrouter"      # openrouter | gemini | groq | ollama | nvidia | openai
     model: "openrouter/auto"    # Automatically choose a capable model per request
     api_key_env: "OPENROUTER_API_KEY"
+    max_output_tokens: 4096       # Keep Auto Router requests affordable
 
   executor:
     provider: "openrouter"
     model: "openrouter/auto"    # Auto Router selects a tool-capable model
     api_key_env: "OPENROUTER_API_KEY"
+    max_output_tokens: 4096
 
   summarizer:
     provider: "openrouter"
     model: "openrouter/auto"
     api_key_env: "OPENROUTER_API_KEY"
+    max_output_tokens: 4096
 
   fallback:
     provider: "openrouter"
     model: "openrouter/auto"
     api_key_env: "OPENROUTER_API_KEY"
+    max_output_tokens: 4096
 
 concurrency:
   max_executors: 1                  # Keep at 1 to avoid 502s from concurrent cloud model requests
@@ -46,7 +50,7 @@ report:
   output_path: "report.md"
 
 browser:
-  headless: true                   # false = see the browser (useful for debugging)
+  headless: false                   # false = see the browser (useful for debugging)
   proxy: null
   use_cloud: false
 

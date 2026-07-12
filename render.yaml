@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: verity
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: VERITY_API_TOKEN
+        generateValue: true
+      - key: VERITY_REQUIRE_API_TOKEN
+        value: "true"
+      - key: VERITY_MAX_ACTIVE_RUNS
+        value: "1"
+      - key: VERITY_RATE_LIMIT_RUNS
+        value: "20"
+      - key: VERITY_RATE_LIMIT_WINDOW_SECONDS
+        value: "3600"

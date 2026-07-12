@@ -35,7 +35,12 @@ def create_llm(provider_config: dict[str, Any]) -> Any:
         from browser_use.llm import ChatOpenRouter
 
         api_key = _resolve_api_key(api_key_env, "OPENROUTER_API_KEY")
-        extra_body = {}
+        extra_body = {
+            # Browser Use does not expose max_tokens as a constructor argument,
+            # but forwards extra_body into OpenAI-compatible requests. Without
+            # this cap, OpenRouter Auto Router can request its 65k-token ceiling.
+            "max_tokens": int(provider_config.get("max_output_tokens", 4096)),
+        }
         fallback_models = provider_config.get("fallback_models") or []
         if fallback_models:
             extra_body["models"] = fallback_models

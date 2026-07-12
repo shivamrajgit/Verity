@@ -243,9 +243,19 @@ export function useRunStream() {
   }, []);
 
   const startRun = useCallback(
-    (url: string, instructions: string) => {
+    async (url: string, instructions: string) => {
       closeStream();
       dispatch({ kind: "start", target: url });
+
+      try {
+        await api.authenticate();
+      } catch (error) {
+        dispatch({
+          kind: "stream-error",
+          message: error instanceof Error ? error.message : "API authentication failed.",
+        });
+        return;
+      }
 
       const source = new EventSource(buildRunUrl(url, instructions));
       sourceRef.current = source;

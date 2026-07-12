@@ -24,7 +24,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from langgraph.types import Command
 from pydantic import BaseModel, Field
@@ -93,6 +93,11 @@ def _require_api_token(request: Request) -> None:
         authorization = request.headers.get("authorization", "")
         if authorization.lower().startswith("bearer "):
             provided = authorization[7:].strip()
+    if not provided:
+        # The browser's native EventSource API cannot set custom headers. The
+        # frontend authenticates once and receives an HttpOnly same-origin
+        # cookie so SSE and subsequent control requests share the session.
+        provided = request.cookies.get("verity_api_token", "")
     if not provided or not hmac.compare_digest(provided, expected):
         raise HTTPException(status_code=401, detail="Invalid or missing API token")
 
@@ -670,6 +675,39 @@ def _enforce_rate_limit(request: Request) -> None:
 # ---------------------------------------------------------------------------
 # API endpoint — run agent and stream results via SSE
 # ---------------------------------------------------------------------------
+
+@app.post("/api/auth")
+async def authenticate(request: Request):
+    """Exchange an API token header for a short-lived same-origin cookie."""
+    expected = os.environ.get("VERITY_API_TOKEN", "")
+    required = os.environ.get("VERITY_REQUIRE_API_TOKEN", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if not expected:
+        if required:
+            raise HTTPException(status_code=503, detail="API authentication is not configured")
+        return {"ok": True}
+
+    provided = request.headers.get("x-api-key", "")
+    if not provided:
+        authorization = request.headers.get("authorization", "")
+        if authorization.lower().startswith("bearer "):
+            provided = authorization[7:].strip()
+    if not provided or not hmac.compare_digest(provided, expected):
+        raise HTTPException(status_code=401, detail="Invalid or missing API token")
+
+    response = JSONResponse({"ok": True})
+    response.set_cookie(
+        key="verity_api_token",
+        value=provided,
+        max_age=86400,
+        httponly=True,
+        secure=request.url.scheme == "https" or os.environ.get("RENDER") == "true",
+        samesite="strict",
+    )
+    return response
 
 @app.get("/api/run")
 async def run_agent_sse(

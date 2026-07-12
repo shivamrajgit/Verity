@@ -38,6 +38,22 @@ def test_protected_endpoints_require_configured_token(monkeypatch) -> None:
     )
 
 
+def test_protected_sse_accepts_authenticated_session_cookie(monkeypatch) -> None:
+    monkeypatch.setenv("VERITY_API_TOKEN", "test-token")
+    client = TestClient(app)
+
+    auth = client.post("/api/auth", headers={"X-API-Key": "test-token"})
+
+    assert auth.status_code == 200
+    assert (
+        client.get(
+            "/api/run",
+            params={"url": "https://example.com", "config": "../.env"},
+        ).status_code
+        == 400
+    )
+
+
 def test_run_endpoint_rate_limits_by_ip(monkeypatch) -> None:
     monkeypatch.delenv("VERITY_API_TOKEN", raising=False)
     monkeypatch.setenv("VERITY_RATE_LIMIT_RUNS", "3")

@@ -191,12 +191,16 @@ async def _call_openrouter(
             "'OPENROUTER_API_KEY' environment variable."
         )
 
+    extra_body: dict[str, Any] = {
+        "max_tokens": int(config.get("max_output_tokens", 4096)),
+    }
+    if config.get("fallback_models"):
+        extra_body["models"] = config["fallback_models"]
+
     llm = ChatOpenRouter(
         model=config.get("model", "openrouter/auto"),
         api_key=api_key,
-        extra_body=(
-            {"models": config["fallback_models"]} if config.get("fallback_models") else None
-        ),
+        extra_body=extra_body,
         max_retries=3,
     )
     response = await retry_async(

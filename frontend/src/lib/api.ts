@@ -23,7 +23,7 @@ export function setApiToken(token: string): void {
   }
 }
 
-/** Build the SSE URL, including the token as a query param when set. */
+/** Build the SSE URL. Authentication is established with `authenticate()` first. */
 export function buildRunUrl(url: string, instructions: string): string {
   const params = new URLSearchParams({ url, instructions });
   return `/api/run?${params.toString()}`;
@@ -60,6 +60,8 @@ export interface HeadlessResult {
 }
 
 export const api = {
+  authenticate: () => post<{ ok: boolean }>("/api/auth"),
+
   cancel: (runId: string) => post(`/api/runs/${encodeURIComponent(runId)}/cancel`),
 
   respond: (runId: string, answer: string) =>

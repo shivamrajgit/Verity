@@ -25,6 +25,12 @@ class LLMProviderConfig(BaseModel):
         default_factory=list,
         description="OpenRouter model IDs to try after the primary model fails",
     )
+    max_output_tokens: int = Field(
+        default=4096,
+        ge=256,
+        le=16384,
+        description="Maximum completion tokens per provider request",
+    )
 
     @field_validator("provider")
     @classmethod

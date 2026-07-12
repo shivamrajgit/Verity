@@ -59,6 +59,7 @@ def test_openrouter_factory_configures_model_fallbacks(monkeypatch) -> None:
 
     assert llm.provider == "openrouter"
     assert llm.model == "qwen/qwen3-vl-32b-instruct"
+    assert llm.extra_body["max_tokens"] == 4096
     assert llm.extra_body["models"] == [
         "qwen/qwen3.5-flash-02-23",
         "mistralai/mistral-small-3.2-24b-instruct",
