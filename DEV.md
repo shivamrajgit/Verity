@@ -71,9 +71,10 @@ the committed `static/` build) that runs on either Render or Railway:
 
 1. Ensure `static/` holds a fresh `make frontend-build`, then push the repo to GitHub.
 2. For Render, choose **New → Blueprint**, select the repo, and keep the root
-   `render.yaml`. It configures the Docker runtime, `/api/health` check, rate
-   limits, and a generated API token. Enter your `OPENROUTER_API_KEY` when Render
-   prompts for it. Alternatively, create a Web Service and select **Docker**.
+   `render.yaml`. It configures the Docker runtime, `/api/health` check, and
+   rate-limited unauthenticated access for a personal deployment (5 runs per IP
+   per day). Enter your `OPENROUTER_API_KEY` when Render prompts for it.
+   Alternatively, create a Web Service and select **Docker**.
 3. For Railway or a manual Render Web Service, set environment variables:
    - `OPENROUTER_API_KEY` — your provider key (the server pays for runs).
    - Either `VERITY_API_TOKEN` (require a token) **or** `VERITY_ALLOW_UNAUTHENTICATED=true` for an open, rate-limited personal deploy.

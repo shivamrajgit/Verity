@@ -7,13 +7,11 @@ services:
     envVars:
       - key: OPENROUTER_API_KEY
         sync: false
-      - key: VERITY_API_TOKEN
-        generateValue: true
-      - key: VERITY_REQUIRE_API_TOKEN
+      - key: VERITY_ALLOW_UNAUTHENTICATED
         value: "true"
       - key: VERITY_MAX_ACTIVE_RUNS
         value: "1"
       - key: VERITY_RATE_LIMIT_RUNS
-        value: "20"
+        value: "5"
       - key: VERITY_RATE_LIMIT_WINDOW_SECONDS
-        value: "3600"
+        value: "86400"
