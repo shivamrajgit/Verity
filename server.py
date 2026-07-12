@@ -610,11 +610,70 @@ def _find_first_interrupt(tasks: Any) -> dict[str, Any] | None:
 
 
 # ---------------------------------------------------------------------------
+# Lightweight per-IP rate limiting for the run endpoint
+# ---------------------------------------------------------------------------
+# A dependency-free, in-memory sliding-window limiter. This fits a single
+# always-on instance (Render/Railway free tier) and protects the operator's
+# provider credits and RAM from a bot or accidental hammering. It is not a
+# distributed limiter; horizontally scaled deployments should front the app
+# with a shared limiter/reverse proxy instead.
+
+_RATE_LIMIT_HITS: dict[str, list[float]] = {}
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP, honoring the proxy header used by Render/Railway."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client is not None:
+        return request.client.host
+    return "unknown"
+
+
+def _enforce_rate_limit(request: Request) -> None:
+    """Raise HTTP 429 when an IP exceeds the configured run budget.
+
+    Configured via VERITY_RATE_LIMIT_RUNS (max runs per window) and
+    VERITY_RATE_LIMIT_WINDOW_SECONDS. Setting the run count to 0 disables it.
+    """
+    max_runs = int(os.environ.get("VERITY_RATE_LIMIT_RUNS", "20"))
+    window = int(os.environ.get("VERITY_RATE_LIMIT_WINDOW_SECONDS", "3600"))
+    if max_runs <= 0:
+        return
+
+    ip = _client_ip(request)
+    now = time.time()
+    recent = [ts for ts in _RATE_LIMIT_HITS.get(ip, []) if now - ts < window]
+
+    if len(recent) >= max_runs:
+        retry_after = max(1, int(window - (now - recent[0])) + 1)
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Please wait before starting another run.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    recent.append(now)
+    _RATE_LIMIT_HITS[ip] = recent
+
+    # Opportunistically evict stale IP buckets so the map cannot grow unbounded.
+    if len(_RATE_LIMIT_HITS) > 1024:
+        for key in list(_RATE_LIMIT_HITS):
+            fresh = [ts for ts in _RATE_LIMIT_HITS[key] if now - ts < window]
+            if fresh:
+                _RATE_LIMIT_HITS[key] = fresh
+            else:
+                del _RATE_LIMIT_HITS[key]
+
+
+# ---------------------------------------------------------------------------
 # API endpoint — run agent and stream results via SSE
 # ---------------------------------------------------------------------------
 
 @app.get("/api/run")
 async def run_agent_sse(
+    request: Request,
     url: str,
     instructions: str = "",
     config: str = "config.yaml",
@@ -628,6 +687,7 @@ async def run_agent_sse(
         config: Path to config YAML (default: config.yaml).
     """
 
+    _enforce_rate_limit(request)
     _cleanup_sessions()
     active_runs = sum(1 for session in RUN_SESSIONS.values() if session.status == "running")
     if active_runs >= MAX_ACTIVE_RUNS:
@@ -823,13 +883,21 @@ if __name__ == "__main__":
     import uvicorn
 
     host = os.environ.get("VERITY_HOST", "127.0.0.1")
-    if host not in {"127.0.0.1", "localhost", "::1"} and not os.environ.get("VERITY_API_TOKEN"):
-        raise RuntimeError("VERITY_API_TOKEN is required when binding beyond localhost")
-    print(f"[{_timestamp()}] Starting Verity Web UI server...")
-    print(f"[{_timestamp()}] Open http://localhost:8000 in your browser")
-    uvicorn.run(
-        app,
-        host=host,
-        port=int(os.environ.get("VERITY_PORT", "8000")),
-        log_level="info",
-    )
+    # Honor the platform-provided port (Render/Railway set $PORT).
+    port = int(os.environ.get("VERITY_PORT") or os.environ.get("PORT") or "8000")
+
+    is_local = host in {"127.0.0.1", "localhost", "::1"}
+    allow_unauthenticated = os.environ.get("VERITY_ALLOW_UNAUTHENTICATED", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if not is_local and not os.environ.get("VERITY_API_TOKEN") and not allow_unauthenticated:
+        raise RuntimeError(
+            "Refusing to bind beyond localhost without protection. Set VERITY_API_TOKEN to "
+            "require a token, or VERITY_ALLOW_UNAUTHENTICATED=true to run open on a personal, "
+            "rate-limited deployment."
+        )
+
+    print(f"[{_timestamp()}] Starting Verity Web UI server on {host}:{port}...")
+    uvicorn.run(app, host=host, port=port, log_level="info")

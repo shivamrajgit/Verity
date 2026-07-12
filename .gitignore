@@ -13,6 +13,10 @@ report.md
 reports/
 test.md
 
+# Frontend build tooling (source lives in frontend/, built output in static/)
+frontend/node_modules/
+frontend/.vite/
+
 # Internal project files
 tasks/
 .github/

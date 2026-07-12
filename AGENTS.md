@@ -7,9 +7,10 @@
 - `src/llm/` contains provider integrations, retry handling, direct chat, and the LLM factory.
 - `src/models/` contains Pydantic state, test-plan, executor-result, and report schemas.
 - `src/utils/` contains URL normalization, target security validation, and safe fallback helpers.
-- `server.py` provides the FastAPI/SSE backend; frontend assets are in `static/`.
+- `server.py` provides the FastAPI/SSE backend. The web UI is a React + Vite + TypeScript app (Tailwind) in `frontend/`; `npm run build` compiles it into `static/`, which the backend serves at `/` and mounts at `/static`.
 - `tests/` contains pytest coverage for configuration, security, routing, provider fallbacks, planner repair, reports, and server behavior.
 - `config.yaml` and `.env.example` document runtime configuration. Generated `report.md` and `reports/` output must remain uncommitted.
+- `Dockerfile` and `.dockerignore` build a self-contained image (Playwright Chromium plus the committed `static/` build) for Render or Railway. `static/` is a committed build artifact; `frontend/node_modules/` stays uncommitted.
 
 ## Runtime and Setup
 
@@ -42,9 +43,17 @@ make run ARGS=--gemini             # One run with Gemini, Auto Router fallback
 make run-auto                      # CLI with automatic approvals
 make run-auto ARGS=--gemini        # Auto-approve plus Gemini override
 uv run verity --help               # Installed CLI entry point
-python server.py                   # Web UI at http://localhost:8000
+make setup                         # Python env plus frontend npm install
+make frontend-dev                  # Vite dev server (proxies /api to :8000)
+make frontend-build                # Compile the React UI into static/
+make serve                         # Run the FastAPI web UI (honors $PORT)
+make web                           # Build the UI, then serve it
 make clean                         # Remove local caches and bytecode
 ```
+
+The frontend is a React + Vite + TypeScript app in `frontend/`. Edit it there and
+run `make frontend-build` to refresh the committed `static/` bundle; the backend
+serves that bundle, so no Node runtime is required to run or deploy the server.
 
 The CLI also supports `--config`, `--url`, `--urls`, `--instructions`,
 `--auto-approve`, `--verbose`, and the case-insensitive alias `--Gemini`.
@@ -71,7 +80,9 @@ Tests use pytest with `pytest-asyncio` in auto mode. Name files `test_*.py` and 
 The server binds to localhost by default. For deployment, use an authenticated reverse proxy or configure:
 
 - `VERITY_API_TOKEN` and `VERITY_REQUIRE_API_TOKEN=true` to protect run/control endpoints.
-- `VERITY_HOST` and `VERITY_PORT` to control the bind address and port.
+- `VERITY_HOST` and `VERITY_PORT` to control the bind address and port. `$PORT` is honored as a fallback so Render/Railway can assign the port.
+- `VERITY_ALLOW_UNAUTHENTICATED=true` to bind beyond localhost without a token on a personal, rate-limited deploy; otherwise binding publicly requires a token.
+- `VERITY_RATE_LIMIT_RUNS` and `VERITY_RATE_LIMIT_WINDOW_SECONDS` bound per-IP `/api/run` frequency (set the count to `0` to disable).
 - `VERITY_REPORT_DIR` for generated server reports.
 - `VERITY_SESSION_TTL_SECONDS` and `VERITY_MAX_ACTIVE_RUNS` for session retention and concurrency limits.
 
@@ -79,4 +90,4 @@ Keep `allow_private_targets: false` unless trusted local development requires pr
 
 ## Commits and Pull Requests
 
-Existing history uses concise version-style subjects such as `1.0`, `1.0.1`, and `1.0.2`. Match that style for release/version commits; otherwise use a short imperative subject. Pull requests should explain behavior changes, list validation commands, link relevant issues, and include UI notes or screenshots when changing `static/` or `server.py`.
+Existing history uses concise version-style subjects such as `1.0`, `1.0.1`, and `1.0.2`. Match that style for release/version commits; otherwise use a short imperative subject. Pull requests should explain behavior changes, list validation commands, link relevant issues, and include UI notes or screenshots when changing `frontend/`, `static/`, or `server.py`.

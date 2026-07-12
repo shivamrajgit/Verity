@@ -98,25 +98,13 @@ python server.py
 
 Open <http://localhost:8000>. The UI can:
 
-- accept a target URL and optional instructions
+- accept a target URL (bare hosts like `example.com` work — `https://` is added automatically) and optional instructions
 - stream planner, executor, and system logs through SSE
 - submit planner clarification answers
 - cancel active runs
 - display structured results and the final Markdown report
 
-For deployment, keep the server behind an authenticated reverse proxy or configure:
-
-```text
-VERITY_API_TOKEN=replace-with-a-long-random-token
-VERITY_REQUIRE_API_TOKEN=true
-VERITY_HOST=127.0.0.1
-VERITY_PORT=8000
-VERITY_REPORT_DIR=reports
-VERITY_SESSION_TTL_SECONDS=3600
-VERITY_MAX_ACTIVE_RUNS=2
-```
-
-The server rejects private or loopback targets by default. Configure `security.allow_private_targets` only for trusted local development, and use `security.allowed_target_domains` to restrict target scope.
+Self-hosting the web UI — the frontend build, server hardening (auth tokens, rate limits), and deploying with Docker on Render or Railway — is covered in [DEV.md](DEV.md).
 
 ## Reports and Outputs
 
@@ -126,13 +114,4 @@ Generated reports, `.env`, caches, bytecode, and build artifacts are ignored by 
 
 ## Development
 
-```bash
-make check
-make lint
-make format
-make test
-make test-slow
-make clean
-```
-
-The test suite covers configuration validation, target security, planner schema repair, provider fallbacks, graph behavior, deterministic reports, and server controls without making live API or browser calls.
+Contributing, the frontend build, quality commands, and deployment are documented in [DEV.md](DEV.md). Repository conventions are in [AGENTS.md](AGENTS.md).

@@ -1,9 +1,35 @@
-.PHONY: develop check test lint format clean run
+.PHONY: develop setup check test lint format clean run run-auto \
+        serve web frontend-install frontend-dev frontend-build
 
 # ── Setup ──
 develop:
 	uv sync --all-extras
 	@echo "✓ Environment ready"
+
+# Full setup: Python environment plus frontend dependencies.
+setup: develop frontend-install
+	@echo "✓ Python and frontend dependencies installed"
+
+# ── Frontend (React + Vite → static/) ──
+# Installs only when node_modules is missing, so builds stay fast.
+frontend/node_modules:
+	cd frontend && npm install
+
+frontend-install: frontend/node_modules
+
+frontend-dev: frontend/node_modules
+	cd frontend && npm run dev
+
+frontend-build: frontend/node_modules
+	cd frontend && npm run build
+	@echo "✓ Frontend built into static/"
+
+# ── Web server (serves the built UI + SSE API) ──
+serve:
+	uv run python server.py
+
+# Build the UI, then start the server that serves it.
+web: frontend-build serve
 
 # ── Quality ──
 check: lint test
